@@ -7,13 +7,13 @@ import streamlit.components.v1 as components
 from PIL import Image
 import json
 
-# --- 1. SETUP CONNECTIONS ---
+# --- 1. SETUP CONNECTIONS (WITH DEBUG ERROR) ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
-    st.error("Connection Error: Check your Streamlit Secrets.")
+    st.error(f"Setup Error: {e}")
 
 # --- 2. STYLE & BRANDING ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
@@ -28,7 +28,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. TUNISIAN TYPEWRITER (BIG & BOLD) ---
+# --- 3. TUNISIAN TYPEWRITER ---
 def typewriter_effect():
     html_code = """
     <div class="typewriter-container" id="typewriter"></div>
@@ -61,38 +61,36 @@ def typewriter_effect():
     """
     components.html(html_code, height=80)
 
-# --- 4. AUTHENTICATION (WITH BIG BOLD WELCOME) ---
+# --- 4. AUTHENTICATION (WITH DEBUG ERROR) ---
 if "user_email" not in st.session_state:
     typewriter_effect()
-    
-    st.markdown("""
-        <p style='font-family: "Inter", sans-serif; font-size: 28px; font-weight: 700; color: #000000; margin-bottom: 5px;'>
-        Bienvenue. Entrez votre email pour commencer.
-        </p>
-    """, unsafe_allow_html=True)
-    
+    st.markdown("<p style='font-family: Inter; font-size: 28px; font-weight: 700;'>Bienvenue. Entrez votre email.</p>", unsafe_allow_html=True)
     email_input = st.text_input("Email", placeholder="exemple@email.com", label_visibility="collapsed")
     
     if st.button("Commencer", use_container_width=True):
         if email_input:
             try:
+                # This tries to save the email. If it fails, it shows the exact error.
                 supabase.table("users").upsert({"email": email_input}).execute()
                 st.session_state.user_email = email_input
                 st.rerun()
-            except:
-                st.error("Erreur de connexion à la base de données.")
+            except Exception as e:
+                st.error(f"Database Error: {e}")
     st.stop()
 
 # --- 5. SIDEBAR & NAVIGATION ---
 st.sidebar.markdown(f"### **KhirMinTaki**")
-st.sidebar.caption(f"Connecté: {st.session_state.user_email}")
 if st.sidebar.button("Déconnexion"):
     del st.session_state.user_email
     st.rerun()
 
-chapters_data = supabase.table("chapters").select("*").execute()
-chapter_names = [c['name'] for c in chapters_data.data]
-selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
+try:
+    chapters_data = supabase.table("chapters").select("*").execute()
+    chapter_names = [c['name'] for c in chapters_data.data]
+    selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
+except Exception as e:
+    st.error(f"Error loading chapters: {e}")
+    st.stop()
 
 # --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
@@ -106,7 +104,7 @@ if selected_chapter == "Sélectionner...":
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     
-    # PROGRESS TRACKER (MASTERY BAR)
+    # PROGRESS TRACKER
     score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
     if score_res.data:
         latest_score = score_res.data[0]['score']
@@ -194,7 +192,7 @@ else:
                     res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail sur {selected_chapter}. LaTeX.", img])
                     st.markdown(res.text)
 
-    # TAB 4: QUIZ EXPRESS (ACTIVE RECALL)
+    # TAB 4: QUIZ EXPRESS
     with tab4:
         if st.button("Générer un Quiz"):
             with st.spinner("Chargement..."):
