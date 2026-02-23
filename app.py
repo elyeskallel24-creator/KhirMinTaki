@@ -13,9 +13,9 @@ try:
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
-    st.error("Connection Error: Check Secrets.")
+    st.error("Connection Error: Check your Streamlit Secrets.")
 
-# --- 2. THE CUSTOM FONT & MINIMALIST CSS ---
+# --- 2. STYLE & BRANDING ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
@@ -24,24 +24,24 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
-    [data-testid="stSidebar"] * { color: #000000 !important; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     .typewriter-container { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 24px; color: #000000; height: 40px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ROTATING TYPEWRITER COMPONENT ---
+# --- 3. TUNISIAN TYPEWRITER ---
 def typewriter_effect():
     html_code = """
     <div class="typewriter-container" id="typewriter"></div>
     <script>
         const textElement = document.getElementById("typewriter");
         const words = ["KhirMinTaki", "A9ra khir", "A9ra asra3"];
-        let wordIndex = 0; let charIndex = 0; let isDeleting = false; let typeSpeed = 150;
+        let wordIndex = 0; let charIndex = 0; let isDeleting = false;
         function type() {
             const currentWord = words[wordIndex];
-            if (isDeleting) { textElement.textContent = currentWord.substring(0, charIndex - 1); charIndex--; typeSpeed = 100; }
-            else { textElement.textContent = currentWord.substring(0, charIndex + 1); charIndex++; typeSpeed = 150; }
+            if (isDeleting) { textElement.textContent = currentWord.substring(0, charIndex - 1); charIndex--; }
+            else { textElement.textContent = currentWord.substring(0, charIndex + 1); charIndex++; }
+            let typeSpeed = isDeleting ? 100 : 150;
             if (!isDeleting && charIndex === currentWord.length) { isDeleting = true; typeSpeed = 2000; }
             else if (isDeleting && charIndex === 0) { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typeSpeed = 500; }
             setTimeout(type, typeSpeed);
@@ -51,23 +51,20 @@ def typewriter_effect():
     """
     components.html(html_code, height=50)
 
-# --- 4. LOGIN GATE ---
+# --- 4. AUTHENTICATION ---
 if "user_email" not in st.session_state:
     typewriter_effect()
-    st.write("Bienvenue. Veuillez entrer votre email pour accéder à votre espace d'apprentissage.")
+    st.write("Bienvenue. Entrez votre email pour commencer.")
     email_input = st.text_input("Email", placeholder="exemple@email.com")
     if st.button("Commencer"):
         if email_input:
-            try:
-                supabase.table("users").upsert({"email": email_input}).execute()
-                st.session_state.user_email = email_input
-                st.rerun()
-            except: st.error("Erreur de connexion.")
-        else: st.error("Veuillez entrer un email valide.")
+            supabase.table("users").upsert({"email": email_input}).execute()
+            st.session_state.user_email = email_input
+            st.rerun()
     st.stop()
 
-# --- 5. NAVIGATION & LOGOUT ---
-st.sidebar.markdown("### **KhirMinTaki**") 
+# --- 5. SIDEBAR & NAVIGATION ---
+st.sidebar.markdown(f"### **KhirMinTaki**")
 st.sidebar.caption(f"Connecté: {st.session_state.user_email}")
 if st.sidebar.button("Déconnexion"):
     del st.session_state.user_email
@@ -77,64 +74,107 @@ chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
 
-# --- 6. MAIN INTERFACE ---
+# --- 6. DASHBOARD OR CHAPTER VIEW ---
 if selected_chapter == "Sélectionner...":
-    user_display_name = st.session_state.user_email.split('@')[0].capitalize()
-    st.write(f"### **Bienvenue, {user_display_name}**") 
-    st.write("Sélectionnez un module pour commencer.")
+    name = st.session_state.user_email.split('@')[0].capitalize()
+    st.write(f"### **Bienvenue, {name}**")
+    st.write("Prêt pour une session d'apprentissage ? Choisissez un module à gauche.")
+    
+    # Simple Progress Stats
+    stats = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
+    st.metric("Chapitres explorés", len(stats.data))
+
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
-    tab1, tab2, tab3, tab4 = st.tabs(["Conversation", "Documents", "Analyse Photo", "Quiz Express"])
-
-    # (Previous Tabs logic omitted for brevity but should stay in your file)
-    # [LOGIC FOR TAB 1, 2, 3 REMAINS THE SAME]
     
+    # Load Data from Supabase
+    res = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
+    if res.data:
+        st.session_state.study_plan = res.data[0].get('study_plan')
+        st.session_state.resume = res.data[0].get('course_resume')
+    else:
+        st.session_state.study_plan = None
+        st.session_state.resume = None
+
+    # TABS SYSTEM
+    tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
+
+    # TAB 1: CHAT
+    with tab1:
+        if "messages" not in st.session_state: st.session_state.messages = []
+        for m in st.session_state.messages:
+            with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
+        
+        if prompt := st.chat_input("Une question sur ce chapitre ?"):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"): st.markdown(prompt)
+            
+            with st.chat_message("assistant"):
+                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Tuteur expert. Style minimaliste. Pas d'emojis. Utilise LaTeX.")
+                response = model.generate_content(prompt)
+                st.markdown(response.text.replace("[PHASE_PLAN]", ""))
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
+                if "[PHASE_PLAN]" in response.text and not st.session_state.study_plan:
+                    plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Plan d'étude pour {selected_chapter}").text
+                    supabase.table("student_sessions").insert({"chapter_id": chapter_id, "user_email": st.session_state.user_email, "study_plan": plan}).execute()
+                    st.session_state.study_plan = plan
+                    st.rerun()
+
+    # TAB 2: DOCUMENTS
+    with tab2:
+        if st.session_state.study_plan:
+            st.subheader("Votre Plan d'étude")
+            st.markdown(st.session_state.study_plan)
+            st.divider()
+            if st.session_state.resume:
+                st.subheader("Résumé du Cours")
+                st.markdown(st.session_state.resume)
+            else:
+                if st.button("Générer un résumé complet"):
+                    with st.spinner("Rédaction du résumé..."):
+                        resume_text = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Résumé détaillé en LaTeX pour {selected_chapter}").text
+                        supabase.table("student_sessions").update({"course_resume": resume_text}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
+                        st.session_state.resume = resume_text
+                        st.rerun()
+        else:
+            st.info("Commencez la discussion dans l'onglet Conversation pour générer votre plan.")
+
+    # TAB 3: IMAGE ANALYSIS
+    with tab3:
+        st.subheader("Correction de Photo")
+        img_file = st.file_uploader("Upload ton exercice", type=["jpg", "png", "jpeg"])
+        if img_file:
+            img = Image.open(img_file)
+            st.image(img, width=400)
+            if st.button("Analyser mon travail"):
+                with st.spinner("KhirMinTaki lit ton écriture..."):
+                    vision_res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail de maths sur {selected_chapter}. Utilise LaTeX.", img])
+                    st.markdown(vision_res.text)
+
+    # TAB 4: QUIZ EXPRESS
     with tab4:
-        st.write("### **Quiz d'auto-évaluation**")
-        st.write("Teste tes connaissances avec 3 questions rapides.")
-        
-        if st.button("Générer un nouveau Quiz"):
-            with st.spinner("Génération des questions..."):
-                quiz_prompt = f"""
-                Génère 3 questions à choix multiples sur le chapitre : {selected_chapter}.
-                Format de réponse attendu : JSON uniquement avec cette structure :
-                [
-                  {{"question": "texte", "options": ["A", "B", "C"], "answer": "B", "explication": "explication LaTeX"}}
-                ]
-                Style : Minimaliste, pas d'emojis.
-                """
-                raw_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(quiz_prompt).text
-                # Clean the response to ensure it's valid JSON
-                clean_json = raw_response.replace('```json', '').replace('```', '').strip()
-                st.session_state.current_quiz = json.loads(clean_json)
-                st.session_state.quiz_submitted = False
-        
+        st.subheader("Quiz de Maîtrise")
+        if st.button("Nouveau Quiz"):
+            with st.spinner("Préparation des questions..."):
+                q_prompt = f"Génère 3 questions MCQ sur {selected_chapter}. Format JSON: [{{'question':'','options':['','',''],'answer':'','explication':''}}]"
+                raw = genai.GenerativeModel("gemini-1.5-flash").generate_content(q_prompt).text
+                st.session_state.current_quiz = json.loads(raw.replace('```json','').replace('```',''))
+                st.session_state.quiz_done = False
+
         if "current_quiz" in st.session_state:
             score = 0
-            user_answers = []
+            u_answers = []
             for i, q in enumerate(st.session_state.current_quiz):
-                st.write(f"**Q{i+1}: {q['question']}**")
-                choice = st.radio(f"Sélectionnez une réponse pour Q{i+1}", q['options'], key=f"q{i}")
-                user_answers.append(choice)
+                u_answers.append(st.radio(q['question'], q['options'], key=f"qz_{i}"))
             
-            if st.button("Valider mes réponses"):
-                st.session_state.quiz_submitted = True
-                
-            if st.session_state.get('quiz_submitted'):
+            if st.button("Soumettre"):
+                st.session_state.quiz_done = True
                 for i, q in enumerate(st.session_state.current_quiz):
-                    if user_answers[i] == q['answer']:
-                        st.success(f"Q{i+1}: Correct !")
-                        score += 1
-                    else:
-                        st.error(f"Q{i+1}: Incorrect. La réponse était {q['answer']}")
-                        st.info(f"Explication : {q['explication']}")
+                    if u_answers[i] == q['answer']:
+                        st.success(f"Q{i+1} Correct!"); score += 1
+                    else: st.error(f"Q{i+1} Faux. C'était {q['answer']}. {q['explication']}")
                 
-                final_score = int((score / 3) * 100)
-                st.write(f"### Ton score : {final_score}%")
-                
-                # SAVE TO SUPABASE
-                supabase.table("quiz_scores").insert({
-                    "user_email": st.session_state.user_email,
-                    "chapter_id": chapter_id,
-                    "score": final_score
-                }).execute()
+                final = int((score/3)*100)
+                st.write(f"### Score: {final}%")
+                supabase.table("quiz_scores").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "score": final}).execute()
