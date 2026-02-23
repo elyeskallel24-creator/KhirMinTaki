@@ -20,13 +20,19 @@ def generate_study_plan(history, chapter):
 
 def generate_resume(chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Rédige un résumé de cours structuré pour le chapitre : {chapter}. Inclus les formules clés en LaTeX (ex: $$x^2$$) et les définitions. Français Académique."
+    prompt = f"Rédige un résumé de cours structuré pour le chapitre : {chapter}. Inclus les formules clés en LaTeX (ex: $$x^2$$). Français Académique."
     response = model.generate_content(prompt)
     return response.text
 
 def generate_series(chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Génère une série de 3 exercices d'application pour le chapitre {chapter}. Les exercices doivent être progressifs. Utilise LaTeX pour les formules mathématiques. Français Académique."
+    prompt = f"Génère une série de 3 exercices d'application progressifs pour {chapter}. Utilise LaTeX. Français Académique."
+    response = model.generate_content(prompt)
+    return response.text
+
+def generate_correction(series, chapter):
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    prompt = f"Donne la correction détaillée de cette série d'exercices pour le chapitre {chapter} : {series}. Explique chaque étape. Utilise LaTeX. Français Académique."
     response = model.generate_content(prompt)
     return response.text
 
@@ -48,20 +54,19 @@ if "resume" not in st.session_state:
     st.session_state.resume = None
 if "series" not in st.session_state:
     st.session_state.series = None
+if "correction" not in st.session_state:
+    st.session_state.correction = None
 
 # --- 5. MAIN LOGIC ---
 if selected_chapter != "Sélectionner...":
     st.title(f"📖 {selected_chapter}")
     
-    # UI Tabs for better organization
-    tab1, tab2, tab3 = st.tabs(["📋 Plan & Diagnostic", "📝 Résumé du Cours", "✍️ Série d'Exercices"])
+    tab1, tab2, tab3 = st.tabs(["📋 Plan & Diagnostic", "📝 Résumé", "✍️ Série & Correction"])
     
     with tab1:
         if st.session_state.study_plan:
-            st.success("Plan d'Étude Disponible")
-            with st.expander("Voir le Plan", expanded=True):
+            with st.expander("Voir le Plan d'Étude", expanded=True):
                 st.markdown(st.session_state.study_plan)
-        
         st.divider()
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
@@ -75,33 +80,47 @@ if selected_chapter != "Sélectionner...":
                 with st.spinner("Rédaction..."):
                     st.session_state.resume = generate_resume(selected_chapter)
                     st.rerun()
-        else:
-            st.info("Terminez le diagnostic pour débloquer le résumé.")
 
     with tab3:
         if st.session_state.series:
+            st.markdown("### Exercices")
             st.markdown(st.session_state.series)
+            st.divider()
+            if st.session_state.correction:
+                st.markdown("### Correction Détaillée")
+                st.markdown(st.session_state.correction)
+            else:
+                if st.button("Afficher la Correction"):
+                    with st.spinner("Calcul de la correction..."):
+                        st.session_state.correction = generate_correction(st.session_state.series, selected_chapter)
+                        st.rerun()
         elif st.session_state.resume:
-            if st.button("Générer la Série d'Exercices"):
-                with st.spinner("Création des exercices..."):
+            if st.button("Générer la Série"):
+                with st.spinner("Création..."):
                     st.session_state.series = generate_series(selected_chapter)
                     st.rerun()
-        else:
-            st.info("Générez d'abord le résumé pour accéder aux exercices.")
 
-    # Chat Input (Always available if not finished)
-    if prompt := st.chat_input("Posez votre question..."):
+    # Chat Input
+    if prompt := st.chat_input("Posez une question ou soumettez une réponse..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
         with st.chat_message("assistant"):
-            system_prompt = f"Tu es un professeur de maths pour {selected_chapter}. Pose 3 questions de diagnostic. À la fin, ajoute [PHASE_PLAN]. Français Académique."
+            # Context-Aware System Prompt
+            context = "Diagnostic" if st.session_state.study_plan is None else "Support/Correction"
+            system_prompt = f"""
+            Tu es un professeur de maths tunisien. Phase actuelle : {context}.
+            Si Phase=Diagnostic: Pose 3 questions, fini par [PHASE_PLAN].
+            Si Phase=Support: Aide l'élève sur le résumé ou la série d'exercices. Ne donne pas la réponse direct, guide-le.
+            Langue : Français Académique. LaTeX pour maths.
+            """
             model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
             history = [{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]]
             chat_session = model.start_chat(history=history)
             response = chat_session.send_message(prompt)
             st.markdown(response.text.replace("[PHASE_PLAN]", ""))
             st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
             if "[PHASE_PLAN]" in response.text and st.session_state.study_plan is None:
                 st.session_state.study_plan = generate_study_plan(st.session_state.messages, selected_chapter)
                 st.rerun()
