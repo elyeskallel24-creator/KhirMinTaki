@@ -20,7 +20,7 @@ st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
@@ -61,16 +61,26 @@ def typewriter_effect():
     """
     components.html(html_code, height=80)
 
-# --- 4. AUTHENTICATION ---
+# --- 4. AUTHENTICATION (WITH BIG BOLD WELCOME) ---
 if "user_email" not in st.session_state:
     typewriter_effect()
-    st.write("Bienvenue. Entrez votre email pour commencer.")
-    email_input = st.text_input("Email", placeholder="exemple@email.com")
-    if st.button("Commencer"):
+    
+    st.markdown("""
+        <p style='font-family: "Inter", sans-serif; font-size: 28px; font-weight: 700; color: #000000; margin-bottom: 5px;'>
+        Bienvenue. Entrez votre email pour commencer.
+        </p>
+    """, unsafe_allow_html=True)
+    
+    email_input = st.text_input("Email", placeholder="exemple@email.com", label_visibility="collapsed")
+    
+    if st.button("Commencer", use_container_width=True):
         if email_input:
-            supabase.table("users").upsert({"email": email_input}).execute()
-            st.session_state.user_email = email_input
-            st.rerun()
+            try:
+                supabase.table("users").upsert({"email": email_input}).execute()
+                st.session_state.user_email = email_input
+                st.rerun()
+            except:
+                st.error("Erreur de connexion à la base de données.")
     st.stop()
 
 # --- 5. SIDEBAR & NAVIGATION ---
@@ -96,7 +106,7 @@ if selected_chapter == "Sélectionner...":
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     
-    # PROGRESS TRACKER
+    # PROGRESS TRACKER (MASTERY BAR)
     score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
     if score_res.data:
         latest_score = score_res.data[0]['score']
@@ -175,7 +185,7 @@ else:
 
     # TAB 3: PHOTO ANALYSIS
     with tab3:
-        img_file = st.file_uploader("Upload", type=["jpg", "png", "jpeg"])
+        img_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
         if img_file:
             img = Image.open(img_file)
             st.image(img, width=400)
@@ -184,7 +194,7 @@ else:
                     res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail sur {selected_chapter}. LaTeX.", img])
                     st.markdown(res.text)
 
-    # TAB 4: QUIZ EXPRESS
+    # TAB 4: QUIZ EXPRESS (ACTIVE RECALL)
     with tab4:
         if st.button("Générer un Quiz"):
             with st.spinner("Chargement..."):
@@ -207,5 +217,5 @@ else:
                     else: st.error(f"Q{i+1} Faux. C'était {q['answer']}. {q['explication']}")
                 
                 final = int((score/3)*100)
-                st.write(f"### Score: {final}%")
+                st.write(f"### Score Final: {final}%")
                 supabase.table("quiz_scores").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "score": final}).execute()
