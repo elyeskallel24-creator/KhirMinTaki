@@ -2,9 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 from groq import Groq
 from supabase import create_client
-import streamlit.components.v1 as components
 
-# --- 1. SETUP ---
+# --- 1. CORE SETUP ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -12,117 +11,117 @@ try:
 except Exception as e:
     st.error(f"Configuration Error: {e}")
 
-# FIX: Layout must be "centered" or "wide". We use "centered" for that clean AI feel.
 st.set_page_config(page_title="KhirMinTaki", layout="centered")
 
-# --- 2. THE LAYERED UI ENGINE (CSS) ---
+# --- 2. CLEAN AI-NATIVE CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; }
     header, footer, [data-testid="stSidebar"] { visibility: hidden; }
 
-    /* Minimal Floating Header */
-    .app-header {
-        position: fixed; top: 0; left: 0; width: 100%;
-        background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
-        padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
-        z-index: 1000; display: flex; justify-content: space-between; align-items: center;
-    }
+    /* Centered UI */
+    .main-container { max-width: 700px; margin: 0 auto; padding-top: 50px; }
     
-    .mastery-progress {
-        position: fixed; top: 55px; left: 0; width: 100%; height: 3px;
-        background: #f0f0f0; z-index: 1001;
+    /* Fixed Mastery Header */
+    .mastery-header {
+        position: fixed; top: 0; left: 0; width: 100%; background: white;
+        padding: 15px 20px; border-bottom: 1px solid #f0f0f0; z-index: 1000;
+        display: flex; justify-content: space-between; align-items: center;
     }
-    .mastery-fill { height: 100%; background: #10a37f; transition: width 1s ease; }
+    .progress-bar-bg { position: fixed; top: 55px; left: 0; width: 100%; height: 3px; background: #f0f0f0; z-index: 1001; }
+    .progress-bar-fill { height: 100%; background: #10a37f; transition: width 0.8s ease; }
 
-    /* Input Styling */
-    .stChatFloatingInputContainer { background: white !important; padding-bottom: 20px !important; }
-    
-    /* Center Fix */
-    .block-container { padding-top: 80px !important; }
+    /* Interactive Cards */
+    .subject-card {
+        padding: 30px; border: 1px solid #eee; border-radius: 15px; 
+        text-align: center; cursor: pointer; transition: 0.3s;
+    }
+    .subject-card:hover { border-color: #10a37f; background: #f9fbf9; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIC: SESSION & AUTH ---
-if "user_email" not in st.session_state:
-    st.markdown("<div style='text-align:center; padding-top:50px;'><h1>KhirMinTaki</h1></div>", unsafe_allow_html=True)
-    c1, mid, c2 = st.columns([1, 2, 1])
-    with mid:
-        email = st.text_input("Email", placeholder="ton-email@taki.com")
-        if st.button("Commencer", use_container_width=True):
-            if email:
-                st.session_state.user_email = email
+# --- 3. WORKFLOW CONTROLLER ---
+if "view" not in st.session_state: st.session_state.view = "dashboard"
+
+# --- VIEW 1: SUBJECT DASHBOARD ---
+if st.session_state.view == "dashboard":
+    st.markdown("<div style='text-align:center; padding-top:100px;'><h1>KhirMinTaki</h1><p>Choose a subject to begin</p></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("<div class='subject-card'><h2>📐</h2><h3>Mathematics</h3></div>", unsafe_allow_html=True)
+        if st.button("Open Mathematics", use_container_width=True):
+            st.session_state.selected_subject = "Mathematics"
+            st.session_state.view = "chapters"
+            st.rerun()
+
+# --- VIEW 2: CHAPTER LIST ---
+elif st.session_state.view == "chapters":
+    st.button("← Back", on_click=lambda: st.session_state.update({"view": "dashboard"}))
+    st.markdown(f"## {st.session_state.selected_subject} Chapters")
+    try:
+        chapters = supabase.table("chapters").select("*").execute().data
+        for ch in chapters:
+            if st.button(f"💬 {ch['name']}", use_container_width=True):
+                st.session_state.current_chapter = ch['name']
+                st.session_state.chapter_id = ch['id']
+                st.session_state.view = "chat"
+                st.session_state.messages = []
                 st.rerun()
-    st.stop()
+    except: st.error("Database unavailable.")
 
-# --- 4. NAVIGATION ---
-try:
-    chapters = supabase.table("chapters").select("*").execute().data
-    chapter_names = [c['name'] for c in chapters]
-except:
-    st.error("Connection error")
-    st.stop()
-
-# Header Display
-mastery_pct = 45 
-st.markdown(f"""
-    <div class="app-header">
-        <span style="font-weight:700; font-size:16px;">KhirMinTaki</span>
-        <span style="color:#10a37f; font-weight:700; font-size:14px;">Mastery: {mastery_pct}%</span>
-    </div>
-    <div class="mastery-progress"><div class="mastery-fill" style="width:{mastery_pct}%;"></div></div>
-""", unsafe_allow_html=True)
-
-sel_chap = st.selectbox("Chapitre", ["Choisir un chapitre..."] + chapter_names, label_visibility="collapsed")
-
-# --- 5. THE CONVERSATION ---
-if sel_chap == "Choisir un chapitre...":
-    st.markdown("<div style='text-align:center; padding-top:10vh;'><h2 style='color:#ccc;'>Bienvenue. Quel chapitre allons-nous maîtriser aujourd'hui ?</h2></div>", unsafe_allow_html=True)
-else:
-    chapter_id = next(c['id'] for c in chapters if c['name'] == sel_chap)
+# --- VIEW 3: THE LEARNING WORKSPACE ---
+elif st.session_state.view == "chat":
+    # Header
+    st.markdown(f"""
+        <div class="mastery-header">
+            <span style="font-weight:700;">{st.session_state.current_chapter}</span>
+            <span style="color:#10a37f; font-weight:700;">Mastery: 0%</span>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:5%;"></div></div>
+    """, unsafe_allow_html=True)
     
-    # DB Session Sync
-    sess_res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", chapter_id).execute()
-    if not sess_res.data:
-        supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "phase": "assessment"}).execute()
-        st.rerun()
-    curr_sess = sess_res.data[0]
+    # Session Persistence
+    res = supabase.table("student_sessions").select("*").eq("chapter_id", st.session_state.chapter_id).execute()
+    curr_sess = res.data[0] if res.data else {"phase": "assessment", "study_plan": None, "course_resume": None}
 
-    if "messages" not in st.session_state or st.session_state.get("last_chap") != sel_chap:
-        st.session_state.messages = [{"role": "assistant", "content": f"Asslema! On commence **{sel_chap}**. Quel est ton niveau actuel ?"}]
-        st.session_state.last_chap = sel_chap
+    # Shadow Infrastructure (The Drawer)
+    with st.expander("📚 Study Records (Plan, Resume, Exercises)"):
+        tab1, tab2, tab3, tab4 = st.tabs(["Study Plan", "Course Resume", "Exercises", "Notes"])
+        tab1.write(curr_sess.get('study_plan') or "AI is building this based on your chat...")
+        tab2.write(curr_sess.get('course_resume') or "Key concepts will appear here as we go.")
+        tab3.write("Exercise history will be stored here.")
+        tab4.write("Personalized remarks and hints tailored for you.")
 
-    # Display History
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if "[PLAN_READY]" in msg["content"]:
-                with st.expander("📂 Voir mon Plan d'étude & Résumé", expanded=True):
-                    t1, t2 = st.tabs(["Plan", "Résumé"])
-                    t1.write(curr_sess.get('study_plan', 'Analyse en cours...'))
-                    t2.write(curr_sess.get('course_resume', 'S\'ajoutera bientôt.'))
+    # Chat Logic
+    if not st.session_state.messages:
+        st.session_state.messages = [{"role": "assistant", "content": f"Asslema! Let's master **{st.session_state.current_chapter}**. To start, what's your current level with this topic?"}]
 
-    # Input Logic
-    if prompt := st.chat_input("Réponds ici..."):
+    for m in st.session_state.messages:
+        with st.chat_message(m["role"]): st.markdown(m["content"])
+
+    if prompt := st.chat_input("Answer the tutor..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
-
+        
         with st.chat_message("assistant"):
+            sys_msg = f"Tunisian Math Tutor. Phase: {curr_sess['phase']}. If you have enough info, write [GENERATE_PLAN]. If teaching, write [UPDATE_RESUME]."
             try:
-                # Using Groq/Llama for speed, Gemini as fallback
-                chat_completion = groq_client.chat.completions.create(
-                    messages=[{"role": "system", "content": "Tu es un tuteur expert tunisien. Utilise LaTeX. Si l'évaluation est finie, ajoute [PLAN_READY] à la fin."}] + st.session_state.messages[-5:],
-                    model="llama-3.3-70b-versatile",
-                )
-                response = chat_completion.choices[0].message.content
+                response = groq_client.chat.completions.create(
+                    messages=[{"role": "system", "content": sys_msg}] + st.session_state.messages[-5:],
+                    model="llama-3.3-70b-versatile"
+                ).choices[0].message.content
             except:
-                response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt).text
+                response = "Désolé, j'ai eu un petit problème technique. Peux-tu répéter ?"
             
-            st.markdown(response.replace("[PLAN_READY]", ""))
+            st.markdown(response.replace("[GENERATE_PLAN]", "").replace("[UPDATE_RESUME]", ""))
             st.session_state.messages.append({"role": "assistant", "content": response})
-            
-            if "[PLAN_READY]" in response:
-                supabase.table("student_sessions").update({"study_plan": response, "phase": "learning"}).eq("id", curr_sess["id"]).execute()
-                st.rerun()
+
+            # Update Hidden Infrastructure
+            if "[GENERATE_PLAN]" in response:
+                supabase.table("student_sessions").upsert({
+                    "chapter_id": st.session_state.chapter_id,
+                    "study_plan": response,
+                    "phase": "teaching"
+                }).execute()
+                st.toast("Studying Plan Created!")
