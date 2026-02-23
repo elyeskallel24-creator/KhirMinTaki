@@ -32,7 +32,8 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. STATS & NAV ---
-st.sidebar.markdown("### **KHIRMINTAKI**") 
+# Updated to Mixed Case and Bold
+st.sidebar.markdown("### **KhirMinTaki**") 
 
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
