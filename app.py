@@ -38,7 +38,8 @@ def create_pdf(title, content):
     pdf.cell(40, 10, title)
     pdf.ln(20)
     pdf.set_font("Arial", size=12)
-    clean_content = content.replace("$$", "").replace("**", "")
+    # Cleaning text for PDF compatibility
+    clean_content = content.replace("$$", "").replace("**", "").replace("$", "")
     pdf.multi_cell(0, 10, clean_content.encode('latin-1', 'replace').decode('latin-1'))
     return pdf.output(dest='S').encode('latin-1')
 
@@ -70,7 +71,7 @@ if selected_chapter == "Sélectionner...":
     with col2: st.markdown(f"<div class='badge-card'><h3>Chapitres</h3><h2>{num_mastered}</h2></div>", unsafe_allow_html=True)
     with col3: st.markdown(f"<div class='badge-card'><h3>Points</h3><h2>{num_mastered * 100}</h2></div>", unsafe_allow_html=True)
     st.divider()
-    st.info("Sélectionnez un chapitre dans la barre latérale pour commencer !")
+    st.info("Sélectionnez un chapitre dans la barre latérale pour commencer votre diagnostic !")
 
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
@@ -82,7 +83,6 @@ else:
         st.session_state.study_plan = existing.data[0].get('study_plan')
         st.session_state.resume = existing.data[0].get('course_resume')
     else:
-        # Check if they generated in this current session but haven't saved/refreshed yet
         if "study_plan" not in st.session_state: st.session_state.study_plan = None
         if "resume" not in st.session_state: st.session_state.resume = None
 
@@ -97,14 +97,15 @@ else:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths. Français Académique. Socratique. [PHASE_PLAN] après 3 questions.")
+                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths tunisien. Français Académique. Socratique. Termine par [PHASE_PLAN] après 3 questions.")
                 chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
                 response = chat.send_message(prompt)
                 st.markdown(response.text.replace("[PHASE_PLAN]", ""))
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
-                    plan_prompt = f"Crée un plan d'étude pour {selected_chapter}."
+                    # PERSONALIZED PLAN LOGIC
+                    plan_prompt = f"Analyse cette conversation : {str(st.session_state.messages)}. Crée un plan de 4 étapes personnalisé pour {selected_chapter}. Français Académique."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
                     supabase.table("student_sessions").insert({"chapter_id": chapter_id, "study_plan": plan}).execute()
                     st.session_state.study_plan = plan
@@ -113,18 +114,16 @@ else:
 
     with tab2:
         if st.session_state.get('study_plan'):
+            st.markdown("### ✅ Votre Plan d'Étude Personnalisé")
             st.markdown(st.session_state.study_plan)
+            
             if st.session_state.get('resume'):
                 st.divider()
+                st.markdown("### 📝 Résumé du Cours")
                 st.markdown(st.session_state.resume)
                 pdf = create_pdf(f"Resume: {selected_chapter}", st.session_state.resume)
                 st.download_button("📥 Télécharger PDF", data=pdf, file_name="resume.pdf")
             else:
-                if st.button("Débloquer le Résumé"):
-                    res_prompt = f"Rédige un résumé LaTeX pour {selected_chapter}."
-                    content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
-                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).execute()
-                    st.session_state.resume = content
-                    st.rerun()
-        else:
-            st.warning("Terminez le diagnostic pour débloquer votre plan !")
+                if st.button("Générer le Résumé"):
+                    # PERSONALIZED RESUME LOGIC
+                    res_prompt = f"Basé sur cette discussion : {str(st.session_state.messages)}, rédige un résumé LaTeX pour {selected_chapter}. Ins
