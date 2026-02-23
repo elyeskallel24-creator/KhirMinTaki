@@ -38,7 +38,6 @@ def create_pdf(title, content):
     pdf.cell(40, 10, title)
     pdf.ln(20)
     pdf.set_font("Arial", size=12)
-    # Cleaning text for PDF compatibility
     clean_content = content.replace("$$", "").replace("**", "").replace("$", "")
     pdf.multi_cell(0, 10, clean_content.encode('latin-1', 'replace').decode('latin-1'))
     return pdf.output(dest='S').encode('latin-1')
@@ -46,12 +45,10 @@ def create_pdf(title, content):
 # --- 4. NAVIGATION & GLOBAL STATS ---
 st.sidebar.title("📚 KhirMinTaki")
 
-# Fetch chapters
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Choisir un Chapitre", ["Sélectionner..."] + chapter_names)
 
-# Stats for Dashboard
 num_mastered = 0
 try:
     all_sessions = supabase.table("student_sessions").select("id").execute()
@@ -104,7 +101,6 @@ else:
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
-                    # PERSONALIZED PLAN LOGIC
                     plan_prompt = f"Analyse cette conversation : {str(st.session_state.messages)}. Crée un plan de 4 étapes personnalisé pour {selected_chapter}. Français Académique."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
                     supabase.table("student_sessions").insert({"chapter_id": chapter_id, "study_plan": plan}).execute()
@@ -125,5 +121,15 @@ else:
                 st.download_button("📥 Télécharger PDF", data=pdf, file_name="resume.pdf")
             else:
                 if st.button("Générer le Résumé"):
-                    # PERSONALIZED RESUME LOGIC
-                    res_prompt = f"Basé sur cette discussion : {str(st.session_state.messages)}, rédige un résumé LaTeX pour {selected_chapter}. Ins
+                    # FIXED LONG PROMPT WITH TRIPLE QUOTES
+                    res_prompt = f"""
+                    Basé sur cette discussion : {str(st.session_state.messages)}, 
+                    rédige un résumé LaTeX pour {selected_chapter}. 
+                    Insiste sur les points faibles identifiés. Français Académique.
+                    """
+                    content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
+                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).execute()
+                    st.session_state.resume = content
+                    st.rerun()
+        else:
+            st.warning("Terminez le diagnostic pour débloquer votre plan !")
