@@ -15,7 +15,7 @@ try:
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
-# --- 2. STYLE & BRANDING ---
+# --- 2. STYLE & BRANDING (NEW SIDEBAR FIX) ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -23,14 +23,31 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
-    [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Make the sidebar toggle button slightly more visible by adding a background */
+    /* FORCE THE SIDEBAR BUTTON TO STAND OUT */
     [data-testid="collapsedControl"] {
-        background-color: #f0f2f6;
-        border-radius: 0 10px 10px 0;
+        background-color: #f0f2f6 !important;
+        border-radius: 0 10px 10px 0 !important;
+        left: 0px !important;
+        top: 20px !important;
+        width: 50px !important;
+        height: 50px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 4px 4px 10px rgba(0,0,0,0.2) !important;
+        z-index: 1000000 !important;
+        cursor: pointer !important;
     }
+    
+    /* Force the arrow icon inside to be black and large */
+    [data-testid="collapsedControl"] svg {
+        width: 35px !important;
+        height: 35px !important;
+        fill: #000000 !important;
+    }
+
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -93,9 +110,8 @@ if selected_chapter == "Sélectionner...":
     name = st.session_state.user_email.split('@')[0].capitalize()
     st.write(f"## **Asslema, {name} !**")
     
-    # CLEAR INSTRUCTION FOR THE SIDEBAR
-    st.info("👈 **Utilisez le menu à gauche pour choisir un chapitre.**")
-    st.warning("Si vous ne voyez pas le menu, cliquez sur la petite flèche ( **>** ) tout en haut à gauche de votre écran.")
+    st.info("👈 **Utilise le menu à gauche pour choisir un cours.**")
+    st.warning("Si le menu est caché, clique sur le carré gris avec la flèche ( > ) tout en haut à gauche.")
     
     try:
         stats = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
@@ -114,6 +130,7 @@ else:
 
     tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
 
+    # (Remaining Logic for Chat, Documents, etc. remains the same)
     with tab1:
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages:
@@ -128,7 +145,7 @@ else:
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     with tab2:
-        st.write("Vos documents s'afficheront ici après avoir discuté avec le tuteur.")
+        st.write("Demandez à l'IA de générer un plan d'étude ou un résumé dans l'onglet Conversation.")
 
     with tab3:
         img_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
@@ -137,4 +154,4 @@ else:
 
     with tab4:
         if st.button("Générer un Quiz"):
-            st.write("Génération en cours...")
+            st.write("Préparez-vous...")
