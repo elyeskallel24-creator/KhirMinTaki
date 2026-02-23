@@ -15,7 +15,7 @@ try:
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
-# --- 2. STYLE & BRANDING (CLEAN TOP-NAV DESIGN) ---
+# --- 2. STYLE & BRANDING ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
@@ -23,20 +23,10 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
-    
-    /* Hide the sidebar completely to avoid confusion */
     [data-testid="stSidebar"] { display: none; }
     [data-testid="collapsedControl"] { display: none; }
-
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    
-    .main-header {
-        font-size: 32px;
-        font-weight: 800;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #f0f0f0;
-        padding-bottom: 10px;
-    }
+    .main-header { font-size: 32px; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,19 +70,19 @@ if "user_email" not in st.session_state:
                 st.error(f"Database Error: {e}")
     st.stop()
 
-# --- 5. TOP NAVIGATION (NEW) ---
+# --- 5. TOP NAVIGATION ---
 col_logo, col_nav, col_out = st.columns([2, 4, 1])
 with col_logo:
     st.markdown("<div class='main-header'>KhirMinTaki</div>", unsafe_allow_html=True)
 
-with col_nav:
-    try:
-        chapters_data = supabase.table("chapters").select("*").execute()
-        chapter_names = [c['name'] for c in chapters_data.data]
-        selected_chapter = st.selectbox("📚 Choisis ton chapitre :", ["Sélectionner..."] + chapter_names, label_visibility="collapsed")
-    except Exception as e:
-        st.error("Erreur de chargement")
-        st.stop()
+try:
+    chapters_data = supabase.table("chapters").select("*").execute()
+    chapter_names = [c['name'] for c in chapters_data.data]
+    with col_nav:
+        selected_chapter = st.selectbox("📚 Chapitres", ["Sélectionner..."] + chapter_names, label_visibility="collapsed")
+except Exception as e:
+    st.error("Erreur base de données")
+    st.stop()
 
 with col_out:
     if st.button("Sortir"):
@@ -114,11 +104,17 @@ if selected_chapter == "Sélectionner...":
         st.metric("Chapitres explorés", 0)
 
 else:
-    # Logic for Chapter...
-    chapter_id = next(c['id'] for c in chapters_data.data if c['name'] == selected_chapter)
-    
-    score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
-    latest_score = score_res.data[0]['score'] if score_res.data else 0
+    chapter_id = next((c['id'] for c in chapters_data.data if c['name'] == selected_chapter), None)
+
+    # SAFETY WRAPPER for Progress Tracker
+    latest_score = 0
+    try:
+        score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
+        if score_res.data:
+            latest_score = score_res.data[-1]['score'] 
+    except:
+        pass
+
     st.write(f"### Chapitre : {selected_chapter}")
     st.write(f"**Maîtrise : {latest_score}%**")
     st.progress(latest_score / 100)
@@ -129,20 +125,26 @@ else:
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"])
+        
         if prompt := st.chat_input("Posez votre question..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                response = model.generate_content(prompt)
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                try:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    response = model.generate_content(prompt)
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                except:
+                    st.error("Erreur de connexion avec l'IA.")
 
     with tab2:
-        st.info("Discute avec l'IA pour générer tes documents.")
+        st.write("Les documents s'afficheront ici.")
 
     with tab3:
-        st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+        img_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+        if img_file:
+            st.image(Image.open(img_file), width=400)
 
     with tab4:
         st.button("Générer un Quiz")
