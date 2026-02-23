@@ -3,6 +3,7 @@ import google.generativeai as genai
 from groq import Groq
 from supabase import create_client
 from fpdf import FPDF
+import streamlit.components.v1 as components
 
 # --- 1. SETUP CONNECTIONS ---
 try:
@@ -12,26 +13,93 @@ try:
 except Exception as e:
     st.error("Connection Error: Check Secrets.")
 
-# --- 2. ULTRA MINIMALIST CSS ---
+# --- 2. THE CUSTOM FONT & MINIMALIST CSS ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; color: #000000; }
+    /* Importing Inter as a close match to Google Sans */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    .stApp { background-color: #ffffff; }
+    
+    /* Clean Sidebar */
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
-    [data-testid="stSidebar"] * { color: #000000 !important; }
+    [data-testid="stSidebar"] * { color: #000000 !important; font-family: 'Inter', sans-serif; }
+
+    /* Hide redundant elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    h1, h2, h3 { font-weight: 400 !important; }
-    .stChatInputContainer { border-top: 1px solid #f0f0f0 !important; }
-    .stChatMessage { border: none !important; background: transparent !important; }
+
+    /* Typewriter Style */
+    .typewriter-container {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 24px;
+        color: #000000;
+        height: 40px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIN GATE ---
+# --- 3. ROTATING TYPEWRITER COMPONENT ---
+def typewriter_effect():
+    html_code = """
+    <div class="typewriter-container" id="typewriter"></div>
+    <script>
+        const textElement = document.getElementById("typewriter");
+        const words = ["KhirMinTaki", "Votre tuteur IA", "Apprentissage pur"];
+        let wordIndex = 0;
+        let charIndex = 0;
+        let isDeleting = false;
+        let typeSpeed = 150;
+
+        function type() {
+            const currentWord = words[wordIndex];
+            if (isDeleting) {
+                textElement.textContent = currentWord.substring(0, charIndex - 1);
+                charIndex--;
+                typeSpeed = 100;
+            } else {
+                textElement.textContent = currentWord.substring(0, charIndex + 1);
+                charIndex++;
+                typeSpeed = 150;
+            }
+
+            if (!isDeleting && charIndex === currentWord.length) {
+                isDeleting = true;
+                typeSpeed = 2000; // Pause at end
+            } else if (isDeleting && charIndex === 0) {
+                isDeleting = false;
+                wordIndex = (wordIndex + 1) % words.length;
+                typeSpeed = 500;
+            }
+
+            setTimeout(type, typeSpeed);
+        }
+        type();
+    </script>
+    <style>
+        .typewriter-container {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 24px;
+            color: #000000;
+        }
+    </style>
+    """
+    components.html(html_code, height=50)
+
+# --- 4. LOGIN GATE ---
 if "user_email" not in st.session_state:
-    st.write("### **KhirMinTaki**")
+    typewriter_effect()
     st.write("Bienvenue. Veuillez entrer votre email pour accéder à votre espace d'apprentissage.")
     
     email_input = st.text_input("Email", placeholder="exemple@email.com")
@@ -41,11 +109,11 @@ if "user_email" not in st.session_state:
             st.rerun()
         else:
             st.error("Veuillez entrer un email valide.")
-    st.stop() 
+    st.stop()
 
-# --- 4. NAVIGATION & LOGOUT ---
+# --- 5. NAVIGATION & LOGOUT ---
 st.sidebar.markdown("### **KhirMinTaki**") 
-st.sidebar.write(f"Utilisateur: {st.session_state.user_email}")
+st.sidebar.caption(f"Connecté: {st.session_state.user_email}")
 
 if st.sidebar.button("Déconnexion"):
     del st.session_state.user_email
@@ -55,7 +123,6 @@ chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
 
-# Fetch stats ONLY for this user
 num_mastered = 0
 try:
     all_sessions = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
@@ -63,10 +130,10 @@ try:
 except:
     num_mastered = 0
 
-# --- 5. MAIN INTERFACE ---
+# --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
     st.write("### **Bienvenue**") 
-    st.write("Sélectionnez un module pour commencer votre session d'apprentissage.")
+    st.write("Sélectionnez un module pour commencer.")
     
     st.divider()
     c1, c2, c3 = st.columns(3)
@@ -82,8 +149,6 @@ if selected_chapter == "Sélectionner...":
 
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
-    
-    # Filter by user_email so students don't see each other's plans
     existing = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
     
     if "messages" not in st.session_state: st.session_state.messages = []
@@ -115,7 +180,6 @@ else:
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
                     plan_prompt = f"Génère un plan d'étude pour {selected_chapter}."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
-                    # IMPORTANT: Save with user_email
                     supabase.table("student_sessions").insert({
                         "chapter_id": chapter_id, 
                         "study_plan": plan,
