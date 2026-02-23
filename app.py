@@ -126,10 +126,9 @@ except:
 
 # --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
-    # PERSONALIZED GREETING ADDED HERE
     user_display_name = st.session_state.user_email.split('@')[0].capitalize()
     st.write(f"### **Bienvenue, {user_display_name}**") 
-    st.write("Sélectionnez un module pour commencer votre session d'apprentissage personnalisée.")
+    st.write("Sélectionnez un module pour commencer.")
     
     st.divider()
     c1, c2, c3 = st.columns(3)
@@ -157,7 +156,7 @@ else:
         st.session_state.resume = st.session_state.get('resume', None)
 
     st.write(f"## {selected_chapter}")
-    tab1, tab2, tab3 = st.tabs(["Conversation", "Documents", "Analyse Photo"]) # ADDED PHOTO TAB
+    tab1, tab2, tab3 = st.tabs(["Conversation", "Documents", "Analyse Photo"])
     
     with tab1:
         for m in st.session_state.messages:
@@ -202,10 +201,28 @@ else:
 
     with tab3:
         st.write("### **Analyse de votre travail**")
-        st.write("Prenez une photo de votre exercice manuscrit pour obtenir une correction.")
-        uploaded_file = st.file_uploader("Choisir une image...", type=["jpg", "jpeg", "png"])
+        st.write("Prenez une photo de votre exercice pour obtenir une correction instantanée.")
+        uploaded_file = st.file_uploader("Importer une photo (Exercice ou Brouillon)", type=["jpg", "jpeg", "png"])
+        
         if uploaded_file:
             img = Image.open(uploaded_file)
-            st.image(img, caption="Image téléchargée", width=300)
-            if st.button("Analyser la photo"):
-                st.info("L'analyse visuelle sera activée dans la prochaine étape...")
+            st.image(img, caption="Document détecté", use_container_width=True)
+            
+            if st.button("Analyser et Corriger"):
+                with st.spinner("KhirMinTaki examine votre écriture..."):
+                    try:
+                        vision_model = genai.GenerativeModel("gemini-1.5-flash")
+                        vision_prompt = f"""
+                        Tu es un tuteur de mathématiques expert pour des élèves tunisiens. 
+                        L'élève a envoyé une photo de son travail sur le chapitre : {selected_chapter}.
+                        1. Transcris le texte manuscrit en LaTeX.
+                        2. Vérifie si le raisonnement et les calculs sont corrects.
+                        3. Si il y a une erreur, explique-la avec pédagogie sans donner la réponse immédiatement.
+                        Style : Minimaliste, sans emojis, réponses en Français.
+                        """
+                        response = vision_model.generate_content([vision_prompt, img])
+                        st.divider()
+                        st.write("### Feedback de l'IA")
+                        st.markdown(response.text)
+                    except Exception as e:
+                        st.error("Erreur d'analyse. Assurez-vous que l'image est claire.")
