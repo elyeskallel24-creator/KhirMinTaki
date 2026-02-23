@@ -171,17 +171,6 @@ else:
                 response = chat.send_message(prompt)
                 st.markdown(response.text.replace("[PHASE_PLAN]", ""))
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
-                
-                if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
-                    plan_prompt = f"Génère un plan d'étude pour {selected_chapter}."
-                    plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
-                    supabase.table("student_sessions").insert({
-                        "chapter_id": chapter_id, 
-                        "study_plan": plan,
-                        "user_email": st.session_state.user_email
-                    }).execute()
-                    st.session_state.study_plan = plan
-                    st.rerun()
 
     with tab2:
         if st.session_state.get('study_plan'):
@@ -191,18 +180,11 @@ else:
                 st.divider()
                 st.write("### Résumé")
                 st.markdown(st.session_state.resume)
-            else:
-                if st.button("Générer le résumé"):
-                    res_prompt = f"Résumé LaTeX pour {selected_chapter}."
-                    content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
-                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
-                    st.session_state.resume = content
-                    st.rerun()
 
     with tab3:
         st.write("### **Analyse de votre travail**")
         st.write("Prenez une photo de votre exercice pour obtenir une correction instantanée.")
-        uploaded_file = st.file_uploader("Importer une photo (Exercice ou Brouillon)", type=["jpg", "jpeg", "png"])
+        uploaded_file = st.file_uploader("Importer une photo", type=["jpg", "jpeg", "png"])
         
         if uploaded_file:
             img = Image.open(uploaded_file)
@@ -212,17 +194,17 @@ else:
                 with st.spinner("KhirMinTaki examine votre écriture..."):
                     try:
                         vision_model = genai.GenerativeModel("gemini-1.5-flash")
-                        vision_prompt = f"""
-                        Tu es un tuteur de mathématiques expert pour des élèves tunisiens. 
-                        L'élève a envoyé une photo de son travail sur le chapitre : {selected_chapter}.
-                        1. Transcris le texte manuscrit en LaTeX.
-                        2. Vérifie si le raisonnement et les calculs sont corrects.
-                        3. Si il y a une erreur, explique-la avec pédagogie sans donner la réponse immédiatement.
-                        Style : Minimaliste, sans emojis, réponses en Français.
-                        """
+                        vision_prompt = f"Tuteur de maths expert. Analyse cette photo d'exercice sur: {selected_chapter}. Transcris en LaTeX, vérifie les calculs et explique les erreurs avec pédagogie. Style minimaliste, pas d'emojis."
                         response = vision_model.generate_content([vision_prompt, img])
+                        
                         st.divider()
                         st.write("### Feedback de l'IA")
                         st.markdown(response.text)
+                        
+                        # THE LINKING FEATURE
+                        if st.button("Poser une question sur cette analyse"):
+                            st.session_state.messages.append({"role": "user", "content": "J'ai envoyé une photo de mon travail. Peux-tu m'expliquer davantage ta correction ?"})
+                            st.session_state.messages.append({"role": "assistant", "content": response.text})
+                            st.success("Analyse ajoutée à la conversation !")
                     except Exception as e:
                         st.error("Erreur d'analyse. Assurez-vous que l'image est claire.")
