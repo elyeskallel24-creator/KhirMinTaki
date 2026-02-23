@@ -20,16 +20,15 @@ st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .typewriter-container { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 24px; color: #000000; height: 40px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. TUNISIAN TYPEWRITER ---
+# --- 3. TUNISIAN TYPEWRITER (BIG & BOLD) ---
 def typewriter_effect():
     html_code = """
     <div class="typewriter-container" id="typewriter"></div>
@@ -48,8 +47,19 @@ def typewriter_effect():
         }
         type();
     </script>
+    <style>
+        .typewriter-container { 
+            font-family: 'Inter', sans-serif; 
+            font-weight: 800; 
+            font-size: 48px; 
+            color: #000000; 
+            height: 60px;
+            display: flex;
+            align-items: center;
+        }
+    </style>
     """
-    components.html(html_code, height=50)
+    components.html(html_code, height=80)
 
 # --- 4. AUTHENTICATION ---
 if "user_email" not in st.session_state:
@@ -86,7 +96,7 @@ if selected_chapter == "Sélectionner...":
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     
-    # NEW FEATURE: PROGRESS TRACKER
+    # PROGRESS TRACKER
     score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
     if score_res.data:
         latest_score = score_res.data[0]['score']
@@ -107,7 +117,7 @@ else:
 
     tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
 
-    # TAB 1: CONVERSATION
+    # TAB 1: CHAT
     with tab1:
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages:
@@ -123,9 +133,9 @@ else:
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 
                 if "[PHASE_PLAN]" in response.text and not st.session_state.study_plan:
-                    plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Plan d'étude pour {selected_chapter}").text
-                    supabase.table("student_sessions").insert({"chapter_id": chapter_id, "user_email": st.session_state.user_email, "study_plan": plan}).execute()
-                    st.session_state.study_plan = plan
+                    plan_res = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Plan d'étude pour {selected_chapter}").text
+                    supabase.table("student_sessions").insert({"chapter_id": chapter_id, "user_email": st.session_state.user_email, "study_plan": plan_res}).execute()
+                    st.session_state.study_plan = plan_res
                     st.rerun()
 
     # TAB 2: DOCUMENTS + PDF EXPORT
@@ -145,7 +155,6 @@ else:
                         st.session_state.resume = resume_text
                         st.rerun()
 
-            # NEW FEATURE: PDF DOWNLOAD
             if st.button("Télécharger le cours en PDF"):
                 pdf = FPDF()
                 pdf.add_page()
@@ -170,7 +179,7 @@ else:
         if img_file:
             img = Image.open(img_file)
             st.image(img, width=400)
-            if st.button("Analyser"):
+            if st.button("Analyser mon travail"):
                 with st.spinner("Analyse..."):
                     res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail sur {selected_chapter}. LaTeX.", img])
                     st.markdown(res.text)
@@ -195,7 +204,7 @@ else:
                 for i, q in enumerate(st.session_state.current_quiz):
                     if u_answers[i] == q['answer']:
                         st.success(f"Q{i+1} Correct!"); score += 1
-                    else: st.error(f"Q{i+1} Faux. C'était {q['answer']}")
+                    else: st.error(f"Q{i+1} Faux. C'était {q['answer']}. {q['explication']}")
                 
                 final = int((score/3)*100)
                 st.write(f"### Score: {final}%")
