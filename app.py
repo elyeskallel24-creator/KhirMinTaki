@@ -4,6 +4,7 @@ from groq import Groq
 from supabase import create_client
 from fpdf import FPDF
 import streamlit.components.v1 as components
+from PIL import Image
 
 # --- 1. SETUP CONNECTIONS ---
 try:
@@ -95,12 +96,11 @@ if "user_email" not in st.session_state:
     if st.button("Commencer"):
         if email_input:
             try:
-                # REGISTER USER IN SUPABASE
                 supabase.table("users").upsert({"email": email_input}).execute()
                 st.session_state.user_email = email_input
                 st.rerun()
             except Exception as e:
-                st.error("Erreur de connexion à la base de données.")
+                st.error("Erreur de connexion.")
         else:
             st.error("Veuillez entrer un email valide.")
     st.stop()
@@ -126,8 +126,10 @@ except:
 
 # --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
-    st.write("### **Bienvenue**") 
-    st.write("Sélectionnez un module pour commencer.")
+    # PERSONALIZED GREETING ADDED HERE
+    user_display_name = st.session_state.user_email.split('@')[0].capitalize()
+    st.write(f"### **Bienvenue, {user_display_name}**") 
+    st.write("Sélectionnez un module pour commencer votre session d'apprentissage personnalisée.")
     
     st.divider()
     c1, c2, c3 = st.columns(3)
@@ -155,13 +157,13 @@ else:
         st.session_state.resume = st.session_state.get('resume', None)
 
     st.write(f"## {selected_chapter}")
-    tab1, tab2 = st.tabs(["Conversation", "Documents"])
+    tab1, tab2, tab3 = st.tabs(["Conversation", "Documents", "Analyse Photo"]) # ADDED PHOTO TAB
     
     with tab1:
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
         
-        if prompt := st.chat_input("..."):
+        if prompt := st.chat_input("Posez votre question..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
@@ -197,3 +199,13 @@ else:
                     supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
                     st.session_state.resume = content
                     st.rerun()
+
+    with tab3:
+        st.write("### **Analyse de votre travail**")
+        st.write("Prenez une photo de votre exercice manuscrit pour obtenir une correction.")
+        uploaded_file = st.file_uploader("Choisir une image...", type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            img = Image.open(uploaded_file)
+            st.image(img, caption="Image téléchargée", width=300)
+            if st.button("Analyser la photo"):
+                st.info("L'analyse visuelle sera activée dans la prochaine étape...")
