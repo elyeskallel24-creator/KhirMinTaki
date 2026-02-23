@@ -9,7 +9,9 @@ import json
 
 # --- 1. SETUP CONNECTIONS ---
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # Set the API key globally
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
@@ -95,7 +97,6 @@ if selected_chapter == "Sélectionner...":
     st.info("Utilise la liste déroulante en haut pour choisir un cours.")
 else:
     chapter_id = next((c['id'] for c in chapters_data.data if c['name'] == selected_chapter), None)
-
     tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
 
     with tab1:
@@ -111,25 +112,23 @@ else:
             
             with st.chat_message("assistant"):
                 try:
-                    # UPDATED MODEL CALL
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    
+                    # FORCING THE STABLE PRODUCTION MODEL
+                    model = genai.GenerativeModel("gemini-pro")
                     response = model.generate_content(prompt)
                     
                     if response.text:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
-                    # FALLBACK IF VERSION 404 OCCURS
+                    # FALLBACK TO ALTERNATE PRODUCTION NAME
                     try:
-                        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                        model = genai.GenerativeModel("gemini-1.5-pro")
                         response = model.generate_content(prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as second_e:
-                        st.error(f"Erreur IA : {str(second_e)}")
+                    except Exception as final_e:
+                        st.error(f"Erreur IA : {str(final_e)}")
 
-    with tab2: st.info("Bientôt disponible : Plans d'étude.")
+    with tab2: st.info("Bientôt disponible.")
     with tab3: st.file_uploader("Upload", type=["jpg","png","jpeg"])
     with tab4: st.button("Lancer le Quiz")
