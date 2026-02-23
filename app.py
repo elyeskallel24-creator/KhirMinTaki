@@ -12,7 +12,8 @@ try:
 except Exception as e:
     st.error(f"Configuration Error: {e}")
 
-st.set_page_config(page_title="KhirMinTaki", layout="tight")
+# FIX: Layout must be "centered" or "wide". We use "centered" for that clean AI feel.
+st.set_page_config(page_title="KhirMinTaki", layout="centered")
 
 # --- 2. THE LAYERED UI ENGINE (CSS) ---
 st.markdown("""
@@ -21,9 +22,6 @@ st.markdown("""
     
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; }
     header, footer, [data-testid="stSidebar"] { visibility: hidden; }
-
-    /* The Centered Column */
-    .main-column { max-width: 750px; margin: 0 auto; padding: 20px; }
 
     /* Minimal Floating Header */
     .app-header {
@@ -34,25 +32,22 @@ st.markdown("""
     }
     
     .mastery-progress {
-        position: fixed; top: 50px; left: 0; width: 100%; height: 3px;
+        position: fixed; top: 55px; left: 0; width: 100%; height: 3px;
         background: #f0f0f0; z-index: 1001;
     }
     .mastery-fill { height: 100%; background: #10a37f; transition: width 1s ease; }
 
-    /* Magic Cards (In-Chat UI) */
-    .magic-card {
-        background: #f9f9f9; border: 1px solid #eee; border-radius: 12px;
-        padding: 20px; margin: 15px 0; border-left: 4px solid #10a37f;
-    }
-
     /* Input Styling */
     .stChatFloatingInputContainer { background: white !important; padding-bottom: 20px !important; }
+    
+    /* Center Fix */
+    .block-container { padding-top: 80px !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIC: SESSION & AUTH ---
 if "user_email" not in st.session_state:
-    st.markdown("<div style='text-align:center; padding-top:100px;'><h1>KhirMinTaki</h1>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding-top:50px;'><h1>KhirMinTaki</h1></div>", unsafe_allow_html=True)
     c1, mid, c2 = st.columns([1, 2, 1])
     with mid:
         email = st.text_input("Email", placeholder="ton-email@taki.com")
@@ -62,7 +57,7 @@ if "user_email" not in st.session_state:
                 st.rerun()
     st.stop()
 
-# --- 4. NAVIGATION (MODERN TOP MENU) ---
+# --- 4. NAVIGATION ---
 try:
     chapters = supabase.table("chapters").select("*").execute().data
     chapter_names = [c['name'] for c in chapters]
@@ -70,52 +65,64 @@ except:
     st.error("Connection error")
     st.stop()
 
-# Minimal Header
-mastery_pct = 45 # Dynamic value
+# Header Display
+mastery_pct = 45 
 st.markdown(f"""
     <div class="app-header">
         <span style="font-weight:700; font-size:16px;">KhirMinTaki</span>
         <span style="color:#10a37f; font-weight:700; font-size:14px;">Mastery: {mastery_pct}%</span>
     </div>
     <div class="mastery-progress"><div class="mastery-fill" style="width:{mastery_pct}%;"></div></div>
-    <div style="height:70px;"></div>
 """, unsafe_allow_html=True)
 
-# Chapter Picker (Clean Dropdown)
-sel_chap = st.selectbox("Chapitre actuel", ["Choisir un chapitre..."] + chapter_names, label_visibility="collapsed")
+sel_chap = st.selectbox("Chapitre", ["Choisir un chapitre..."] + chapter_names, label_visibility="collapsed")
 
-# --- 5. THE CONVERSATION (THE PRODUCT) ---
+# --- 5. THE CONVERSATION ---
 if sel_chap == "Choisir un chapitre...":
     st.markdown("<div style='text-align:center; padding-top:10vh;'><h2 style='color:#ccc;'>Bienvenue. Quel chapitre allons-nous maîtriser aujourd'hui ?</h2></div>", unsafe_allow_html=True)
 else:
     chapter_id = next(c['id'] for c in chapters if c['name'] == sel_chap)
     
-    # Load Database Session
+    # DB Session Sync
     sess_res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", chapter_id).execute()
     if not sess_res.data:
         supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "phase": "assessment"}).execute()
         st.rerun()
     curr_sess = sess_res.data[0]
 
-    # Initialize Messages
     if "messages" not in st.session_state or st.session_state.get("last_chap") != sel_chap:
-        st.session_state.messages = [{"role": "assistant", "content": f"Asslema! On commence **{sel_chap}**. Avant de plonger dans le cours, dis-moi ce que tu sais déjà sur ce sujet ?"}]
+        st.session_state.messages = [{"role": "assistant", "content": f"Asslema! On commence **{sel_chap}**. Quel est ton niveau actuel ?"}]
         st.session_state.last_chap = sel_chap
 
-    # Display Chat
+    # Display History
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-            # Display "Magic Cards" if plan exists
             if "[PLAN_READY]" in msg["content"]:
-                with st.expander("📂 Voir mon Plan d'étude & Résumé"):
+                with st.expander("📂 Voir mon Plan d'étude & Résumé", expanded=True):
                     t1, t2 = st.tabs(["Plan", "Résumé"])
-                    t1.write(curr_sess.get('study_plan', 'Génération...'))
-                    t2.write(curr_sess.get('course_resume', 'S\'ajoutera au fur et à mesure.'))
+                    t1.write(curr_sess.get('study_plan', 'Analyse en cours...'))
+                    t2.write(curr_sess.get('course_resume', 'S\'ajoutera bientôt.'))
 
-    # Input Area
+    # Input Logic
     if prompt := st.chat_input("Réponds ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        st.rerun()
-        
-        # (AI Logic would happen here in a real run)
+        with st.chat_message("user"): st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            try:
+                # Using Groq/Llama for speed, Gemini as fallback
+                chat_completion = groq_client.chat.completions.create(
+                    messages=[{"role": "system", "content": "Tu es un tuteur expert tunisien. Utilise LaTeX. Si l'évaluation est finie, ajoute [PLAN_READY] à la fin."}] + st.session_state.messages[-5:],
+                    model="llama-3.3-70b-versatile",
+                )
+                response = chat_completion.choices[0].message.content
+            except:
+                response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt).text
+            
+            st.markdown(response.replace("[PLAN_READY]", ""))
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            
+            if "[PLAN_READY]" in response:
+                supabase.table("student_sessions").update({"study_plan": response, "phase": "learning"}).eq("id", curr_sess["id"]).execute()
+                st.rerun()
