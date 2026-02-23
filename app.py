@@ -111,22 +111,25 @@ else:
             
             with st.chat_message("assistant"):
                 try:
-                    # RE-INITIALIZE MODEL INSIDE CHAT
+                    # UPDATED MODEL CALL
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel(
-                        model_name="gemini-1.5-flash",
-                        system_instruction="Tu es un tuteur expert. Réponds de façon concise. Utilise LaTeX pour les formules."
-                    )
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    
                     response = model.generate_content(prompt)
                     
                     if response.text:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    else:
-                        st.error("L'IA n'a pas pu générer de texte.")
                 except Exception as e:
-                    st.error(f"Erreur IA : {str(e)}")
+                    # FALLBACK IF VERSION 404 OCCURS
+                    try:
+                        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                        response = model.generate_content(prompt)
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    except Exception as second_e:
+                        st.error(f"Erreur IA : {str(second_e)}")
 
-    with tab2: st.info("Bientôt disponible : Plans d'étude et résumés.")
-    with tab3: st.file_uploader("Prendre une photo de l'exercice", type=["jpg","png","jpeg"])
+    with tab2: st.info("Bientôt disponible : Plans d'étude.")
+    with tab3: st.file_uploader("Upload", type=["jpg","png","jpeg"])
     with tab4: st.button("Lancer le Quiz")
