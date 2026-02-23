@@ -42,54 +42,52 @@ def create_pdf(title, content):
     pdf.multi_cell(0, 10, clean_content.encode('latin-1', 'replace').decode('latin-1'))
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. NAVIGATION ---
+# --- 4. NAVIGATION & GLOBAL STATS ---
 st.sidebar.title("📚 KhirMinTaki")
-st.sidebar.write("L'excellence par l'IA.")
 
+# Fetch chapters
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Choisir un Chapitre", ["Sélectionner..."] + chapter_names)
 
-# --- 5. GLOBAL STATS (The Gamification) ---
-all_plans = supabase.table("studying_plans").select("id").execute()
-num_mastered = len(all_plans.data)
+# Stats for Dashboard
+num_mastered = 0
+try:
+    all_sessions = supabase.table("student_sessions").select("id").execute()
+    num_mastered = len(all_sessions.data)
+except:
+    num_mastered = 0
+
 level = "Apprenti"
 if num_mastered > 2: level = "Expert"
 if num_mastered > 5: level = "Maître des Maths"
 
-# --- 6. MAIN INTERFACE ---
+# --- 5. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
     st.title("Tableau de Bord")
-    
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"<div class='badge-card'><h3>Niveau</h3><h2>{level}</h2></div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<div class='badge-card'><h3>Chapitres</h3><h2>{num_mastered}</h2></div>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<div class='badge-card'><h3>Points</h3><h2>{num_mastered * 100}</h2></div>", unsafe_allow_html=True)
-    
+    with col1: st.markdown(f"<div class='badge-card'><h3>Niveau</h3><h2>{level}</h2></div>", unsafe_allow_html=True)
+    with col2: st.markdown(f"<div class='badge-card'><h3>Chapitres</h3><h2>{num_mastered}</h2></div>", unsafe_allow_html=True)
+    with col3: st.markdown(f"<div class='badge-card'><h3>Points</h3><h2>{num_mastered * 100}</h2></div>", unsafe_allow_html=True)
     st.divider()
-    st.info("Sélectionnez un chapitre dans la barre latérale pour continuer votre ascension !")
+    st.info("Sélectionnez un chapitre dans la barre latérale pour commencer !")
 
 else:
-    # Chapter Progress logic
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
-    existing = supabase.table("studying_plans").select("*").eq("chapter_id", chapter_id).execute()
+    existing = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).execute()
     
     if "messages" not in st.session_state: st.session_state.messages = []
     
-    # Load or Reset state
     if existing.data:
-        st.session_state.study_plan = existing.data[0].get('content')
-        st.session_state.resume = existing.data[0].get('resume')
+        st.session_state.study_plan = existing.data[0].get('study_plan')
+        st.session_state.resume = existing.data[0].get('course_resume')
     else:
-        st.session_state.study_plan = st.session_state.get('study_plan')
-        st.session_state.resume = st.session_state.get('resume')
+        # Check if they generated in this current session but haven't saved/refreshed yet
+        if "study_plan" not in st.session_state: st.session_state.study_plan = None
+        if "resume" not in st.session_state: st.session_state.resume = None
 
     st.title(f"📖 {selected_chapter}")
-    
-    tab1, tab2 = st.tabs(["💬 Diagnostic & Chat", "📝 Ressources Débloquées"])
+    tab1, tab2 = st.tabs(["💬 Diagnostic & Chat", "📝 Ressources"])
     
     with tab1:
         for m in st.session_state.messages:
@@ -98,21 +96,19 @@ else:
         if prompt := st.chat_input("Répondez ici..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
-            
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths tunisien. Français Académique. Socratique. [PHASE_PLAN] après 3 questions.")
+                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths. Français Académique. Socratique. [PHASE_PLAN] après 3 questions.")
                 chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
                 response = chat.send_message(prompt)
                 st.markdown(response.text.replace("[PHASE_PLAN]", ""))
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
-                    # Generate & Save Plan
-                    plan_prompt = f"Crée un plan d'étude en 4 étapes pour {selected_chapter}. Français Académique."
+                    plan_prompt = f"Crée un plan d'étude pour {selected_chapter}."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
-                    supabase.table("studying_plans").insert({"chapter_id": chapter_id, "content": plan}).execute()
+                    supabase.table("student_sessions").insert({"chapter_id": chapter_id, "study_plan": plan}).execute()
                     st.session_state.study_plan = plan
-                    st.balloons() # CELEBRATION
+                    st.balloons()
                     st.rerun()
 
     with tab2:
@@ -124,11 +120,11 @@ else:
                 pdf = create_pdf(f"Resume: {selected_chapter}", st.session_state.resume)
                 st.download_button("📥 Télécharger PDF", data=pdf, file_name="resume.pdf")
             else:
-                if st.button("Débloquer le Résumé du Cours"):
-                    res_prompt = f"Rédige un résumé LaTeX pour {selected_chapter}. Français Académique."
+                if st.button("Débloquer le Résumé"):
+                    res_prompt = f"Rédige un résumé LaTeX pour {selected_chapter}."
                     content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
-                    supabase.table("studying_plans").update({"resume": content}).eq("chapter_id", chapter_id).execute()
+                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).execute()
                     st.session_state.resume = content
                     st.rerun()
         else:
-            st.warning("Terminez le diagnostic pour débloquer votre plan et vos points !")
+            st.warning("Terminez le diagnostic pour débloquer votre plan !")
