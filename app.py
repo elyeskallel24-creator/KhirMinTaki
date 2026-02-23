@@ -24,29 +24,46 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     h1, h2, h3 { font-weight: 400 !important; }
-    .small-stat { font-size: 14px; color: #666666; margin-bottom: 5px; }
-    .stat-value { font-size: 18px; font-weight: 500; color: #000000; }
     .stChatInputContainer { border-top: 1px solid #f0f0f0 !important; }
     .stChatMessage { border: none !important; background: transparent !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. STATS & NAV ---
-# Updated to Mixed Case and Bold
+# --- 3. LOGIN GATE ---
+if "user_email" not in st.session_state:
+    st.write("### **KhirMinTaki**")
+    st.write("Bienvenue. Veuillez entrer votre email pour accéder à votre espace d'apprentissage.")
+    
+    email_input = st.text_input("Email", placeholder="exemple@email.com")
+    if st.button("Commencer"):
+        if email_input:
+            st.session_state.user_email = email_input
+            st.rerun()
+        else:
+            st.error("Veuillez entrer un email valide.")
+    st.stop() 
+
+# --- 4. NAVIGATION & LOGOUT ---
 st.sidebar.markdown("### **KhirMinTaki**") 
+st.sidebar.write(f"Utilisateur: {st.session_state.user_email}")
+
+if st.sidebar.button("Déconnexion"):
+    del st.session_state.user_email
+    st.rerun()
 
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
 
+# Fetch stats ONLY for this user
 num_mastered = 0
 try:
-    all_sessions = supabase.table("student_sessions").select("id").execute()
+    all_sessions = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
     num_mastered = len(all_sessions.data)
 except:
     num_mastered = 0
 
-# --- 4. MAIN INTERFACE ---
+# --- 5. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
     st.write("### **Bienvenue**") 
     st.write("Sélectionnez un module pour commencer votre session d'apprentissage.")
@@ -54,18 +71,20 @@ if selected_chapter == "Sélectionner...":
     st.divider()
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown('<p class="small-stat">Niveau</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="stat-value">{"Expert" if num_mastered > 2 else "Apprenti"}</p>', unsafe_allow_html=True)
+        st.write("Niveau")
+        st.write(f"**{'Expert' if num_mastered > 2 else 'Apprenti'}**")
     with c2:
-        st.markdown('<p class="small-stat">Progression</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="stat-value">{num_mastered} chapitres</p>', unsafe_allow_html=True)
+        st.write("Progression")
+        st.write(f"**{num_mastered} chapitres**")
     with c3:
-        st.markdown('<p class="small-stat">Total Points</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="stat-value">{num_mastered * 100}</p>', unsafe_allow_html=True)
+        st.write("Total Points")
+        st.write(f"**{num_mastered * 100}**")
 
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
-    existing = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).execute()
+    
+    # Filter by user_email so students don't see each other's plans
+    existing = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
     
     if "messages" not in st.session_state: st.session_state.messages = []
     
@@ -96,7 +115,12 @@ else:
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
                     plan_prompt = f"Génère un plan d'étude pour {selected_chapter}."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
-                    supabase.table("student_sessions").insert({"chapter_id": chapter_id, "study_plan": plan}).execute()
+                    # IMPORTANT: Save with user_email
+                    supabase.table("student_sessions").insert({
+                        "chapter_id": chapter_id, 
+                        "study_plan": plan,
+                        "user_email": st.session_state.user_email
+                    }).execute()
                     st.session_state.study_plan = plan
                     st.rerun()
 
@@ -112,6 +136,6 @@ else:
                 if st.button("Générer le résumé"):
                     res_prompt = f"Résumé LaTeX pour {selected_chapter}."
                     content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
-                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).execute()
+                    supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
                     st.session_state.resume = content
                     st.rerun()
