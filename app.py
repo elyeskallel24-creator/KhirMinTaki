@@ -20,7 +20,7 @@ def generate_study_plan(history, chapter):
 
 def generate_resume(chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Rédige un résumé de cours structuré pour le chapitre : {chapter}. Inclus les formules clés en LaTeX (ex: $$x^2$$). Français Académique."
+    prompt = f"Rédige un résumé de cours structuré pour le chapitre : {chapter}. Inclus les formules clés en LaTeX. Français Académique."
     response = model.generate_content(prompt)
     return response.text
 
@@ -30,99 +30,86 @@ def generate_series(chapter):
     response = model.generate_content(prompt)
     return response.text
 
-def generate_correction(series, chapter):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Donne la correction détaillée de cette série d'exercices pour le chapitre {chapter} : {series}. Explique chaque étape. Utilise LaTeX. Français Académique."
-    response = model.generate_content(prompt)
-    return response.text
-
 # --- 3. NAVIGATION & UI ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 st.sidebar.title("📚 KhirMinTaki")
-st.sidebar.subheader("Section Mathématiques")
 
+# Fetch chapters
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Choisir un Chapitre", ["Sélectionner..."] + chapter_names)
 
-# --- 4. STATE MANAGEMENT ---
+# --- 4. STATE MANAGEMENT & DATABASE FETCH ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "study_plan" not in st.session_state:
-    st.session_state.study_plan = None
-if "resume" not in st.session_state:
-    st.session_state.resume = None
-if "series" not in st.session_state:
-    st.session_state.series = None
-if "correction" not in st.session_state:
-    st.session_state.correction = None
+
+# Logic to load existing data from Supabase if it exists
+if selected_chapter != "Sélectionner...":
+    # Try to find existing plan for this chapter
+    existing = supabase.table("studying_plans").select("*").eq("chapter_id", chapters_data.data[chapter_names.index(selected_chapter)]['id']).execute()
+    
+    if existing.data:
+        st.session_state.study_plan = existing.data[0].get('content')
+        st.session_state.resume = existing.data[0].get('resume')
+        st.session_state.series = existing.data[0].get('series')
+    else:
+        if "study_plan" not in st.session_state: st.session_state.study_plan = None
+        if "resume" not in st.session_state: st.session_state.resume = None
+        if "series" not in st.session_state: st.session_state.series = None
 
 # --- 5. MAIN LOGIC ---
 if selected_chapter != "Sélectionner...":
     st.title(f"📖 {selected_chapter}")
     
-    tab1, tab2, tab3 = st.tabs(["📋 Plan & Diagnostic", "📝 Résumé", "✍️ Série & Correction"])
+    tab1, tab2, tab3 = st.tabs(["📋 Plan & Diagnostic", "📝 Résumé", "✍️ Série"])
     
     with tab1:
-        if st.session_state.study_plan:
-            with st.expander("Voir le Plan d'Étude", expanded=True):
+        if st.session_state.get('study_plan'):
+            with st.expander("✅ Votre Plan d'Étude", expanded=True):
                 st.markdown(st.session_state.study_plan)
         st.divider()
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"].replace("[PHASE_PLAN]", ""))
+        for m in st.session_state.messages:
+            with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
 
     with tab2:
-        if st.session_state.resume:
+        if st.session_state.get('resume'):
             st.markdown(st.session_state.resume)
-        elif st.session_state.study_plan:
+        elif st.session_state.get('study_plan'):
             if st.button("Générer le Résumé"):
-                with st.spinner("Rédaction..."):
-                    st.session_state.resume = generate_resume(selected_chapter)
-                    st.rerun()
+                content = generate_resume(selected_chapter)
+                # Update Supabase
+                supabase.table("studying_plans").update({"resume": content}).eq("chapter_id", chapters_data.data[chapter_names.index(selected_chapter)]['id']).execute()
+                st.session_state.resume = content
+                st.rerun()
 
     with tab3:
-        if st.session_state.series:
-            st.markdown("### Exercices")
+        if st.session_state.get('series'):
             st.markdown(st.session_state.series)
-            st.divider()
-            if st.session_state.correction:
-                st.markdown("### Correction Détaillée")
-                st.markdown(st.session_state.correction)
-            else:
-                if st.button("Afficher la Correction"):
-                    with st.spinner("Calcul de la correction..."):
-                        st.session_state.correction = generate_correction(st.session_state.series, selected_chapter)
-                        st.rerun()
-        elif st.session_state.resume:
+        elif st.session_state.get('resume'):
             if st.button("Générer la Série"):
-                with st.spinner("Création..."):
-                    st.session_state.series = generate_series(selected_chapter)
-                    st.rerun()
+                content = generate_series(selected_chapter)
+                # Update Supabase
+                supabase.table("studying_plans").update({"series": content}).eq("chapter_id", chapters_data.data[chapter_names.index(selected_chapter)]['id']).execute()
+                st.session_state.series = content
+                st.rerun()
 
     # Chat Input
-    if prompt := st.chat_input("Posez une question ou soumettez une réponse..."):
+    if prompt := st.chat_input("Posez votre question..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant"):
-            # Context-Aware System Prompt
-            context = "Diagnostic" if st.session_state.study_plan is None else "Support/Correction"
-            system_prompt = f"""
-            Tu es un professeur de maths tunisien. Phase actuelle : {context}.
-            Si Phase=Diagnostic: Pose 3 questions, fini par [PHASE_PLAN].
-            Si Phase=Support: Aide l'élève sur le résumé ou la série d'exercices. Ne donne pas la réponse direct, guide-le.
-            Langue : Français Académique. LaTeX pour maths.
-            """
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
-            history = [{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]]
-            chat_session = model.start_chat(history=history)
-            response = chat_session.send_message(prompt)
+            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths, Français Académique, Socratique. Fini par [PHASE_PLAN] après 3 questions.")
+            chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
+            response = chat.send_message(prompt)
             st.markdown(response.text.replace("[PHASE_PLAN]", ""))
             st.session_state.messages.append({"role": "assistant", "content": response.text})
             
-            if "[PHASE_PLAN]" in response.text and st.session_state.study_plan is None:
-                st.session_state.study_plan = generate_study_plan(st.session_state.messages, selected_chapter)
+            if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
+                plan = generate_study_plan(st.session_state.messages, selected_chapter)
+                # Save New Plan to Supabase
+                chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
+                supabase.table("studying_plans").insert({"chapter_id": chapter_id, "content": plan}).execute()
+                st.session_state.study_plan = plan
                 st.rerun()
 else:
     st.title("Bienvenue sur KhirMinTaki")
