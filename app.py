@@ -15,8 +15,12 @@ try:
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
-# --- 2. STYLE & BRANDING (SIDEBAR FIX INCLUDED) ---
-st.set_page_config(page_title="KhirMinTaki", layout="wide")
+# --- 2. STYLE & BRANDING (OPTION 1: SIDEBAR ALWAYS EXPANDED) ---
+st.set_page_config(
+    page_title="KhirMinTaki", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 
 st.markdown("""
     <style>
@@ -25,13 +29,11 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
     
-    /* FIX: Make the sidebar collapse/expand button visible when hidden */
+    /* Extra safety: make sure the toggle button is visible if closed */
     [data-testid="collapsedControl"] {
         background-color: #f0f2f6;
         border-radius: 0 10px 10px 0;
-        padding: 5px;
-        top: 60px; /* Positioned slightly lower so it doesn't overlap header */
-        border: 1px solid #d1d5db;
+        top: 60px;
     }
 
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
@@ -123,7 +125,6 @@ else:
         st.write("**Maîtrise du chapitre : 0%**")
         st.progress(0.0)
 
-    # Load Course Data
     res = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
     if res.data:
         st.session_state.study_plan = res.data[0].get('study_plan')
@@ -172,7 +173,6 @@ else:
                         st.session_state.resume = resume_text
                         st.rerun()
             
-            # PDF Download
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
