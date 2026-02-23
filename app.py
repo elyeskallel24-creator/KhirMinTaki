@@ -4,164 +4,231 @@ from groq import Groq
 from supabase import create_client
 import streamlit.components.v1 as components
 
-# --- 1. CONFIG & SETUP ---
+# --- 1. CORE SETUP ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
-    st.error(f"Setup Error: {e}")
+    st.error(f"System Error: {e}")
 
-st.set_page_config(page_title="KhirMinTaki", layout="wide")
+st.set_page_config(page_title="KhirMinTaki Workspace", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CUSTOM UI ENGINE (MODERN CHATGPT STYLE) ---
+# --- 2. THE MASTER ARCHITECTURE (CSS) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; }
-    
-    /* Force hide any sidebars */
-    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
-    header, footer, #MainMenu { visibility: hidden; }
+    /* 100% Accuracy Layout Engine */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #1a1a1a; }
+    [data-testid="stSidebar"], [data-testid="collapsedControl"], header, footer { display: none !important; }
 
-    /* Right Dashboard Panel */
-    .dashboard-panel {
-        background-color: #f9f9f9;
-        border-left: 1px solid #ececec;
-        padding: 24px;
+    /* Three-Column Grid */
+    .workspace-container {
+        display: grid;
+        grid-template-columns: 260px 1fr 320px;
         height: 100vh;
-        position: fixed;
-        right: 0;
-        top: 0;
+        overflow: hidden;
+    }
+
+    /* Left Sidebar: Curriculum */
+    .left-nav {
+        background-color: #f9f9f9;
+        border-right: 1px solid #efefef;
+        padding: 20px 15px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Central Workspace: Chat */
+    .central-chat {
+        background-color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        padding: 0 40px;
         overflow-y: auto;
     }
 
-    /* Modern Cards */
-    .glass-card {
-        background: white;
-        border: 1px solid #eee;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    
-    .section-title {
-        font-size: 11px;
-        font-weight: 700;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: 12px;
+    /* Right Panel: Academic Persistence */
+    .right-academic {
+        background-color: #ffffff;
+        border-left: 1px solid #efefef;
+        padding: 20px;
+        overflow-y: auto;
     }
 
-    /* Chat Styling */
-    .stChatFloatingInputContainer { 
-        padding-bottom: 40px !important;
-        background-color: transparent !important;
+    /* Mastery Progress UI */
+    .mastery-ring {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        border: 3px solid #f0f0f0;
+        border-top: 3px solid #10a37f;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px; font-weight: 800;
     }
-    .stTextInput input {
-        border-radius: 12px !important;
-        padding: 12px 16px !important;
-        border: 1px solid #e5e5e5 !important;
+
+    /* Message Blocks */
+    .stChatMessage { border: none !important; margin-bottom: 20px !important; }
+    
+    /* Persistent Tabs */
+    .academic-tab {
+        font-size: 12px; font-weight: 600; color: #666;
+        padding: 8px 12px; border-radius: 6px;
+        cursor: pointer; margin-bottom: 10px;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+    .academic-tab:hover { background: #f0f0f0; }
+    .active-tab { background: #f0f0f0; border-color: #ddd; color: #000; }
+
+    /* Theorem/Formula Boxes */
+    .formula-box {
+        background: #f7f7f8; border-left: 4px solid #10a37f;
+        padding: 15px; border-radius: 0 8px 8px 0; margin: 10px 0;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. AUTHENTICATION ---
+# --- 3. AUTHENTICATION & DASHBOARD VIEW ---
 if "user_email" not in st.session_state:
-    st.markdown("<h1 style='text-align:center; margin-top:100px; font-weight:800;'>KhirMinTaki</h1>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding-top:100px;'><h1>KhirMinTaki</h1>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
-        email = st.text_input("Email", placeholder="Continuez avec votre email...", label_visibility="collapsed")
-        if st.button("Se connecter", use_container_width=True):
+        email = st.text_input("Email Student", placeholder="email@taki.com")
+        if st.button("Resume Activity", use_container_width=True):
             if email:
                 st.session_state.user_email = email
-                try: supabase.table("users").upsert({"email": email}).execute()
-                except: pass
+                supabase.table("users").upsert({"email": email}).execute()
                 st.rerun()
     st.stop()
 
-# --- 4. DATA FETCHING ---
-try:
-    chapters = supabase.table("chapters").select("*").execute().data
-    chapter_names = [c['name'] for c in chapters]
-except:
-    st.error("Database Connection Failed.")
+# --- 4. SUBJECT SELECTOR (DASHBOARD CARDS) ---
+if "selected_subject" not in st.session_state:
+    st.markdown("### Subject Workspace")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div style='padding:30px; border:1px solid #eee; border-radius:15px; cursor:pointer;'>
+            <h3>Mathematics</h3>
+            <div class='mastery-ring'>72%</div>
+            <p style='color:#666; font-size:13px;'>Last activity: Today, 10:20</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Enter Mathematics", use_container_width=True):
+            st.session_state.selected_subject = "Mathematics"
+            st.rerun()
     st.stop()
 
-# --- 5. MAIN LAYOUT (TWO COLUMNS) ---
-# Column 1: Spacious Chat | Column 2: Dashboard
-chat_area, dash_area = st.columns([7, 3])
+# --- 5. THE THREE-COLUMN WORKSPACE ---
+try:
+    chapters = supabase.table("chapters").select("*").execute().data
+except:
+    st.error("Connection lost.")
+    st.stop()
 
-with dash_area:
-    st.markdown("<div class='dashboard-panel'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='font-size:22px; margin-bottom:20px;'>KhirMinTaki</h2>", unsafe_allow_html=True)
+# We use Streamlit columns to simulate the 3-column architecture
+left_col, center_col, right_col = st.columns([1, 2.5, 1.5])
+
+# --- LEFT SIDEBAR: CURRICULUM HIERARCHY ---
+with left_col:
+    st.markdown("<h4 style='font-weight:800;'>Curriculum</h4>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:12px; color:#888;'>SUBJECT: MATHEMATICS</p>", unsafe_allow_html=True)
     
-    # Navigation Section
-    st.markdown("<div class='section-title'>Sélection du Cours</div>", unsafe_allow_html=True)
-    sel_chap = st.selectbox("Chapitre", ["Sélectionner..."] + chapter_names, label_visibility="collapsed")
-    
-    if sel_chap != "Sélectionner...":
-        chapter_id = next(c['id'] for c in chapters if c['name'] == sel_chap)
-        
-        # Load or Create Session
-        res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", chapter_id).execute()
-        if not res.data:
-            supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "phase": "assessment"}).execute()
+    for ch in chapters:
+        is_selected = st.session_state.get("current_chapter") == ch['name']
+        btn_label = f"{ch['name']}"
+        if st.button(btn_label, use_container_width=True, type="secondary" if not is_selected else "primary"):
+            st.session_state.current_chapter = ch['name']
+            st.session_state.chapter_id = ch['id']
             st.rerun()
-        
-        curr_sess = res.data[0]
 
-        # Dynamic Resources Section
-        st.markdown("<div style='margin-top:30px;'></div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-title'>Ton Parcours</div>", unsafe_allow_html=True)
-        
-        with st.container():
-            st.markdown("<div class='glass-card'><b>📅 Studying Plan</b><br><small>" + (curr_sess.get('study_plan') or "En attente d'évaluation...") + "</small></div>", unsafe_allow_html=True)
-            st.markdown("<div class='glass-card'><b>📝 Course Resume</b><br><small>" + (curr_sess.get('course_resume') or "S'actualise pendant le cours.") + "</small></div>", unsafe_allow_html=True)
-            st.markdown("<div class='glass-card'><b>✍️ Personal Notes</b><br><small>" + (curr_sess.get('notes') or "Remarques à venir.") + "</small></div>", unsafe_allow_html=True)
-            st.markdown("<div class='glass-card'><b>🎯 Exercises</b><br><small>Maîtrise: 0%</small></div>", unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:40px;'></div>", unsafe_allow_html=True)
-    if st.button("👤 Déconnexion", use_container_width=True):
+    st.divider()
+    if st.button("Log Out"):
         st.session_state.clear()
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 
-with chat_area:
-    if sel_chap == "Sélectionner...":
-        st.markdown("<div style='height:30vh;'></div>", unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align:center; font-weight:700;'>Asslema, " + st.session_state.user_email.split('@')[0].capitalize() + "!</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#666;'>Choisis un chapitre à droite pour commencer ta révision.</p>", unsafe_allow_html=True)
+# --- CENTRAL: CONVERSATIONAL TUTOR ---
+with center_col:
+    if "current_chapter" not in st.session_state:
+        st.markdown("<div style='height:20vh;'></div>", unsafe_allow_html=True)
+        st.info("Select a chapter from the curriculum tree to begin your Diagnostic Phase.")
     else:
-        st.markdown(f"### Révision : {sel_chap}")
+        # Chapter Header
+        st.markdown(f"""
+            <div style='display:flex; justify-content:space-between; align-items:center;'>
+                <h2 style='margin:0;'>{st.session_state.current_chapter}</h2>
+                <span style='background:#e7f5ff; color:#007bff; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700;'>Diagnosing Phase</span>
+            </div>
+        """, unsafe_allow_html=True)
         
+        # Load Session Data
+        sess = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", st.session_state.chapter_id).execute()
+        if not sess.data:
+            supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": st.session_state.chapter_id, "phase": "assessment"}).execute()
+            st.rerun()
+        
+        curr_sess = sess.data[0]
+        
+        # Chat Messages
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "Je suis prêt. Quel est ton niveau actuel sur ce chapitre ?"}]
-
+            st.session_state.messages = [{"role": "assistant", "content": f"Asslema! I'm ready to teach you **{st.session_state.current_chapter}**. Let's start the diagnostic. How confident do you feel about the prerequisites?"}]
+        
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"])
-
-        if prompt := st.chat_input("Écris ton message ici..."):
+        
+        if prompt := st.chat_input("Message AI Tutor..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
             with st.chat_message("assistant"):
+                sys_prompt = f"Expert Tunisian Tutor. Current Phase: {curr_sess['phase']}. Use LaTeX. If assessment is done, end with [GENERATE_PLAN]. If teaching, end with [UPDATE_RESUME]."
                 try:
                     chat = groq_client.chat.completions.create(
-                        messages=[{"role": "system", "content": "Tu es un tuteur Tunisien expert. Utilise LaTeX. Si l'évaluation est finie, ajoute [GENERATE_PLAN]."}] + st.session_state.messages[-5:],
+                        messages=[{"role": "system", "content": sys_prompt}] + st.session_state.messages[-5:],
                         model="llama-3.3-70b-versatile",
                     )
                     res_text = chat.choices[0].message.content
                 except:
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    res_text = model.generate_content(prompt).text
-
-                st.markdown(res_text.replace("[GENERATE_PLAN]", ""))
+                    res_text = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt).text
+                
+                st.markdown(res_text.replace("[GENERATE_PLAN]", "").replace("[UPDATE_RESUME]", ""))
                 st.session_state.messages.append({"role": "assistant", "content": res_text})
                 
+                # Logic Triggers
                 if "[GENERATE_PLAN]" in res_text:
                     supabase.table("student_sessions").update({"study_plan": res_text, "phase": "learning"}).eq("id", curr_sess['id']).execute()
-                    st.toast("Nouveau Plan d'étude disponible !")
+                if "[UPDATE_RESUME]" in res_text:
+                    supabase.table("student_sessions").update({"course_resume": res_text}).eq("id", curr_sess['id']).execute()
+
+# --- RIGHT: ACADEMIC KNOWLEDGE PANEL ---
+with right_col:
+    if "current_chapter" in st.session_state:
+        st.markdown("<h4 style='font-weight:800;'>Academic Panel</h4>", unsafe_allow_html=True)
+        
+        # Mastery Tracker
+        st.markdown(f"""
+            <div style='background:#fcfcfc; border:1px solid #eee; padding:15px; border-radius:10px;'>
+                <p style='font-size:11px; font-weight:700; color:#888; margin:0;'>MASTERY PROGRESS</p>
+                <div style='height:8px; background:#f0f0f0; border-radius:4px; margin:10px 0;'>
+                    <div style='width:15%; height:100%; background:#10a37f; border-radius:4px;'></div>
+                </div>
+                <small>Phase: {curr_sess['phase'].upper()}</small>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Structured Knowledge Tabs
+        with st.expander("📅 Study Plan", expanded=True):
+            st.markdown(curr_sess.get('study_plan') or "_AI is currently analyzing your level to build your plan._")
+            
+        with st.expander("📝 Course Resume"):
+            st.markdown(curr_sess.get('course_resume') or "_Resume will populate as we cover concepts._")
+            
+        with st.expander("✍️ Personal Notes"):
+            st.markdown(curr_sess.get('notes') or "_Personal observations will appear here._")
+
+        with st.expander("🎯 Exercises"):
+            st.write("Exercise history and accuracy tracking.")
