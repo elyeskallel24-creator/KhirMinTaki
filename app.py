@@ -12,7 +12,46 @@ try:
 except Exception as e:
     st.error("Connection Error: Check if your Secrets are set up correctly!")
 
-# --- 2. PDF GENERATOR FUNCTION ---
+# --- 2. CUSTOM CSS (BRANDING) ---
+st.set_page_config(page_title="KhirMinTaki", layout="wide", page_icon="📚")
+
+st.markdown("""
+    <style>
+    /* Main Background */
+    .stApp {
+        background-color: #f8f9fa;
+    }
+    /* Professional Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #1e3a8a;
+        color: white;
+    }
+    [data-testid="stSidebar"] * {
+        color: white !important;
+    }
+    /* Buttons styling */
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        background-color: #1e3a8a;
+        color: white;
+        border: none;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #2563eb;
+        color: white;
+    }
+    /* Chat message styling */
+    .stChatMessage {
+        border-radius: 15px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 3. UTILITY FUNCTIONS ---
 def create_pdf(title, content):
     pdf = FPDF()
     pdf.add_page()
@@ -20,12 +59,11 @@ def create_pdf(title, content):
     pdf.cell(40, 10, title)
     pdf.ln(20)
     pdf.set_font("Arial", size=12)
-    # We clean the text for the PDF (removing complex Markdown)
     clean_content = content.replace("$$", "").replace("**", "")
     pdf.multi_cell(0, 10, clean_content)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 3. AI FUNCTIONS ---
+# --- 4. AI FUNCTIONS ---
 def generate_study_plan(history, chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
     prompt = f"Analyse ce diagnostic pour {chapter}. Crée un plan de 4 étapes avec des cases à cocher. Français Académique."
@@ -33,28 +71,24 @@ def generate_study_plan(history, chapter):
 
 def generate_resume(chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Rédige un résumé structuré pour {chapter}. Utilise impérativement LaTeX ($$ ... $$) pour toutes les formules. Français Académique."
+    prompt = f"Rédige un résumé structuré pour {chapter}. Utilise LaTeX. Français Académique."
     return model.generate_content(prompt).text
 
-def generate_series(chapter):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Génère une série de 3 exercices progressifs pour {chapter}. Utilise LaTeX ($$ ... $$) pour les calculs. Français Académique."
-    return model.generate_content(prompt).text
-
-# --- 4. NAVIGATION & UI ---
-st.set_page_config(page_title="KhirMinTaki", layout="wide")
+# --- 5. NAVIGATION ---
 st.sidebar.title("📚 KhirMinTaki")
+st.sidebar.write("L'école du futur, aujourd'hui.")
 
 if st.sidebar.button("🔄 Réinitialiser la session"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
+    for key in list(st.session_state.keys()): del st.session_state[key]
     st.rerun()
 
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Choisir un Chapitre", ["Sélectionner..."] + chapter_names)
 
-# --- 5. DATA LOADING ---
+# --- 6. STATE & LOADING ---
+if "messages" not in st.session_state: st.session_state.messages = []
+
 if selected_chapter != "Sélectionner...":
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     existing = supabase.table("studying_plans").select("*").eq("chapter_id", chapter_id).execute()
@@ -62,61 +96,59 @@ if selected_chapter != "Sélectionner...":
     if existing.data:
         st.session_state.study_plan = existing.data[0].get('content')
         st.session_state.resume = existing.data[0].get('resume')
-        st.session_state.series = existing.data[0].get('series')
     else:
-        for key in ['study_plan', 'resume', 'series']:
-            if key not in st.session_state: st.session_state[key] = None
+        if "study_plan" not in st.session_state: st.session_state.study_plan = None
+        if "resume" not in st.session_state: st.session_state.resume = None
 
-if "messages" not in st.session_state: st.session_state.messages = []
-
-# --- 6. MAIN DISPLAY ---
-if selected_chapter != "Sélectionner...":
-    # Progress Bar
-    score = 0
-    if st.session_state.get('study_plan'): score += 30
-    if st.session_state.get('resume'): score += 35
-    if st.session_state.get('series'): score += 35
-    st.progress(score / 100)
+# --- 7. MAIN INTERFACE ---
+if selected_chapter == "Sélectionner...":
+    st.title("Bienvenue sur KhirMinTaki")
+    st.subheader("Votre plateforme d'apprentissage intelligente")
+    st.write("""
+        Pour commencer votre session de révision :
+        1. Choisissez un chapitre dans la barre latérale.
+        2. Répondez aux questions de diagnostic du professeur.
+        3. Obtenez votre plan et résumé personnalisés.
+    """)
+    st.info("Utilisez le menu à gauche pour sélectionner une leçon de mathématiques.")
+else:
+    st.title(f"📖 {selected_chapter}")
     
-    tab1, tab2, tab3 = st.tabs(["📋 Diagnostic", "📝 Cours", "✍️ Exercices"])
+    tab1, tab2 = st.tabs(["💬 Diagnostic & Chat", "📝 Ressources"])
     
     with tab1:
         if st.session_state.get('study_plan'):
-            st.markdown(st.session_state.study_plan)
-        st.divider()
+            st.success("Plan d'étude disponible dans l'onglet Ressources.")
+        
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
 
     with tab2:
-        if st.session_state.get('resume'):
-            st.markdown(st.session_state.resume)
-            pdf_bytes = create_pdf(f"Resume: {selected_chapter}", st.session_state.resume)
-            st.download_button("📥 Télécharger le Résumé (PDF)", data=pdf_bytes, file_name="resume.pdf", mime="application/pdf")
-        elif st.session_state.get('study_plan'):
-            if st.button("Générer le Résumé"):
-                content = generate_resume(selected_chapter)
-                supabase.table("studying_plans").update({"resume": content}).eq("chapter_id", chapter_id).execute()
-                st.session_state.resume = content
-                st.rerun()
-
-    with tab3:
-        if st.session_state.get('series'):
-            st.markdown(st.session_state.series)
-            pdf_bytes = create_pdf(f"Serie: {selected_chapter}", st.session_state.series)
-            st.download_button("📥 Télécharger la Série (PDF)", data=pdf_bytes, file_name="serie.pdf", mime="application/pdf")
-        elif st.session_state.get('resume'):
-            if st.button("Générer la Série"):
-                content = generate_series(selected_chapter)
-                supabase.table("studying_plans").update({"series": content}).eq("chapter_id", chapter_id).execute()
-                st.session_state.series = content
-                st.rerun()
+        if st.session_state.get('study_plan'):
+            st.subheader("✅ Votre Plan Personnalisé")
+            st.markdown(st.session_state.study_plan)
+            st.divider()
+            
+            if st.session_state.get('resume'):
+                st.subheader("📝 Résumé du Cours")
+                st.markdown(st.session_state.resume)
+                pdf = create_pdf(f"Resume: {selected_chapter}", st.session_state.resume)
+                st.download_button("📥 Télécharger PDF", data=pdf, file_name="resume.pdf")
+            else:
+                if st.button("Générer le Résumé"):
+                    content = generate_resume(selected_chapter)
+                    supabase.table("studying_plans").update({"resume": content}).eq("chapter_id", chapter_id).execute()
+                    st.session_state.resume = content
+                    st.rerun()
+        else:
+            st.warning("Complétez le diagnostic dans l'onglet Chat pour débloquer les ressources.")
 
     # Chat logic
-    if prompt := st.chat_input("Répondez au prof..."):
+    if prompt := st.chat_input("Répondez ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant"):
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths tunisien. Français Académique. Socratique. [PHASE_PLAN] après 3 questions.")
+            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths tunisien. Français Académique. Socratique. Termine par [PHASE_PLAN] après 3 questions.")
             chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
             response = chat.send_message(prompt)
             st.markdown(response.text.replace("[PHASE_PLAN]", ""))
@@ -127,5 +159,3 @@ if selected_chapter != "Sélectionner...":
                 supabase.table("studying_plans").insert({"chapter_id": chapter_id, "content": plan}).execute()
                 st.session_state.study_plan = plan
                 st.rerun()
-else:
-    st.title("KhirMinTaki")
