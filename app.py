@@ -12,40 +12,38 @@ try:
 except Exception as e:
     st.error(f"Configuration Error: {e}")
 
-# --- 2. STYLE & BRANDING (MODERN DARK/LIGHT HYBRID) ---
-st.set_page_config(page_title="KhirMinTaki", layout="wide", initial_sidebar_state="expanded")
+# --- 2. STYLE & BRANDING (RIGHT-SIDE DASHBOARD) ---
+st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; }
     
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    
-    /* Main Chat Container */
-    .stChatFloatingInputContainer { background-color: white; border-top: 1px solid #f0f0f0; }
-    
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #e0e0e0;
-        min-width: 300px !important;
-    }
-    
-    /* Header removal for clean look */
+    /* Force hide any ghost sidebars */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
     #MainMenu, footer, header {visibility: hidden;}
-    
-    .sidebar-title { font-size: 20px; font-weight: 800; margin-bottom: 20px; color: #1a1a1a; }
-    .nav-label { font-size: 14px; font-weight: 600; color: #666; margin-top: 15px; text-transform: uppercase; }
-    .status-card { background: white; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; }
+
+    .main-header { font-size: 28px; font-weight: 800; color: #1a1a1a; margin-bottom: 10px; }
+    .right-panel {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid #eee;
+        height: 85vh;
+        overflow-y: auto;
+    }
+    .section-label { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
+    .status-badge { background: #000; color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 11px; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. AUTHENTICATION ---
 if "user_email" not in st.session_state:
-    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>KhirMinTaki</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown("<h1 style='text-align: center; margin-top: 80px; font-weight:800;'>KhirMinTaki</h1>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        email = st.text_input("Email", placeholder="votre@email.com")
+        email = st.text_input("Email", placeholder="votre@email.com", label_visibility="collapsed")
         if st.button("Se connecter", use_container_width=True):
             if email:
                 st.session_state.user_email = email
@@ -54,87 +52,95 @@ if "user_email" not in st.session_state:
                 st.rerun()
     st.stop()
 
-# --- 4. SIDEBAR (THE "CHATGPT" STYLE NAVIGATION) ---
-with st.sidebar:
-    st.markdown("<div class='sidebar-title'>KhirMinTaki</div>", unsafe_allow_html=True)
-    
-    # 1. Chapter Selection
-    try:
-        chapters = supabase.table("chapters").select("*").execute().data
-        names = [c['name'] for c in chapters]
-        sel_chap = st.selectbox("📚 Cours", ["Sélectionner..."] + names)
-    except:
-        st.error("Base de données indisponible.")
-        st.stop()
-    
-    if sel_chap != "Sélectionner...":
-        chapter_id = next(c['id'] for c in chapters if c['name'] == sel_chap)
-        session_res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", chapter_id).execute()
-        
-        if not session_res.data:
-            supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "phase": "assessment"}).execute()
-            st.rerun()
-        
-        curr_session = session_res.data[0]
-        
-        # 2. Progress Tracker
-        st.markdown("<div class='nav-label'>Progression</div>", unsafe_allow_html=True)
-        phase_map = {"assessment": "Évaluation", "learning": "Apprentissage", "mastery": "Maîtrise"}
-        st.markdown(f"<div class='status-card'>Phase: <b>{phase_map.get(curr_session['phase'], 'Début')}</b></div>", unsafe_allow_html=True)
-        
-        # 3. Subsections (Study Plan, Resume, etc.)
-        st.markdown("<div class='nav-label'>Bibliothèque</div>", unsafe_allow_html=True)
-        
-        with st.expander("📅 Studying Plan"):
-            st.write(curr_session.get('study_plan') or "En attente...")
-            
-        with st.expander("📝 Course Resume"):
-            st.write(curr_session.get('course_resume') or "En cours de création...")
+# --- 4. TOP BAR ---
+tcol1, tcol2, tcol3 = st.columns([2, 4, 1])
+with tcol1:
+    st.markdown("<div class='main-header'>KhirMinTaki</div>", unsafe_allow_html=True)
 
-        with st.expander("✍️ Notes & Remarques"):
-            st.write(curr_session.get('notes') or "Notes à venir.")
+try:
+    chapters = supabase.table("chapters").select("*").execute().data
+    names = [c['name'] for c in chapters]
+    with tcol2:
+        sel_chap = st.selectbox("📚 Cours", ["Sélectionner un chapitre..."] + names, label_visibility="collapsed")
+except:
+    st.error("Base de données indisponible.")
+    st.stop()
 
-    st.markdown("---")
-    if st.button("Log Out", use_container_width=True):
+with tcol3:
+    if st.button("Sortir", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
-# --- 5. MAIN CHAT AREA ---
-if sel_chap == "Sélectionner...":
+st.divider()
+
+# --- 5. MAIN INTERFACE (SPLIT VIEW) ---
+if sel_chap == "Sélectionner un chapitre...":
     st.write(f"## **Asslema, {st.session_state.user_email.split('@')[0].capitalize()} !**")
-    st.info("Utilise la barre latérale à gauche pour choisir un chapitre et commencer ton tutorat.")
+    st.info("Sélectionne un chapitre en haut pour commencer ton parcours personnalisé.")
 else:
-    st.write(f"### Tutorat : {sel_chap}")
+    chapter_id = next(c['id'] for c in chapters if c['name'] == sel_chap)
     
-    # Chat Logic
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": f"Asslema! Je suis ton tuteur expert pour {sel_chap}. Commençons par évaluer tes bases. Quel est ton niveau actuel ?"}]
+    # Session Loading
+    session_res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", chapter_id).execute()
+    if not session_res.data:
+        supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": chapter_id, "phase": "assessment"}).execute()
+        st.rerun()
     
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.markdown(m["content"])
+    curr_session = session_res.data[0]
     
-    if prompt := st.chat_input("Pose ta question ou réponds au tuteur..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
+    # LAYOUT: Chat (Left) | Dashboard (Right)
+    chat_col, space, dash_col = st.columns([6, 0.5, 3.5])
+
+    with chat_col:
+        st.markdown(f"**Chat avec ton Tuteur Expert • {sel_chap}**")
         
-        with st.chat_message("assistant"):
-            phase = curr_session.get('phase', 'assessment')
-            sys_prompt = f"Tu es un tuteur expert tunisien. Phase: {phase}. Utilise LaTeX. Si tu as assez d'infos pour le plan d'étude, finis par [GENERATE_PLAN]."
+        if "messages" not in st.session_state:
+            st.session_state.messages = [{"role": "assistant", "content": "Asslema! Je suis là pour t'accompagner. Pour commencer, parle-moi de tes difficultés avec ce chapitre."}]
+        
+        for m in st.session_state.messages:
+            with st.chat_message(m["role"]): st.markdown(m["content"])
+        
+        if prompt := st.chat_input("Écris ton message ici..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"): st.markdown(prompt)
             
-            try:
-                chat = groq_client.chat.completions.create(
-                    messages=[{"role": "system", "content": sys_prompt}] + st.session_state.messages[-5:],
-                    model="llama-3.3-70b-versatile",
-                )
-                res_text = chat.choices[0].message.content
-            except:
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                res_text = model.generate_content(prompt).text
+            with st.chat_message("assistant"):
+                phase = curr_session.get('phase', 'assessment')
+                sys_prompt = f"Tu es un tuteur expert tunisien. Phase: {phase}. Utilise LaTeX. Si tu as assez d'infos pour le plan, finis par [GENERATE_PLAN]. Pour le résumé, finis par [UPDATE_RESUME]."
+                
+                try:
+                    chat = groq_client.chat.completions.create(
+                        messages=[{"role": "system", "content": sys_prompt}] + st.session_state.messages[-5:],
+                        model="llama-3.3-70b-versatile",
+                    )
+                    res_text = chat.choices[0].message.content
+                except:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    res_text = model.generate_content(prompt).text
 
-            st.markdown(res_text.replace("[GENERATE_PLAN]", ""))
-            st.session_state.messages.append({"role": "assistant", "content": res_text})
+                st.markdown(res_text.replace("[GENERATE_PLAN]", "").replace("[UPDATE_RESUME]", ""))
+                st.session_state.messages.append({"role": "assistant", "content": res_text})
 
-            # Handle DB Updates
-            if "[GENERATE_PLAN]" in res_text:
-                supabase.table("student_sessions").update({"study_plan": res_text, "phase": "learning"}).eq("id", curr_session['id']).execute()
-                st.toast("Studying Plan mis à jour dans la barre latérale !")
+                if "[GENERATE_PLAN]" in res_text:
+                    supabase.table("student_sessions").update({"study_plan": res_text, "phase": "learning"}).eq("id", curr_session['id']).execute()
+                    st.toast("Plan d'étude généré !")
+
+    with dash_col:
+        st.markdown("<div class='right-panel'>", unsafe_allow_html=True)
+        st.markdown(f"<span class='status-badge'>{curr_session['phase'].upper()}</span>", unsafe_allow_html=True)
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='section-label'>📅 Studying Plan</div>", unsafe_allow_html=True)
+        st.write(curr_session.get('study_plan') or "*Sera généré après l'évaluation.*")
+        
+        st.divider()
+        
+        st.markdown("<div class='section-label'>📝 Course Resume</div>", unsafe_allow_html=True)
+        st.write(curr_session.get('course_resume') or "*Sera créé pendant tes leçons.*")
+        
+        st.divider()
+        
+        st.markdown("<div class='section-label'>✍️ Personal Notes</div>", unsafe_allow_html=True)
+        st.write(curr_session.get('notes') or "*Remarques à venir.*")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
