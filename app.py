@@ -18,7 +18,6 @@ st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
-    /* Importing Inter as a close match to Google Sans */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
     html, body, [class*="css"] {
@@ -28,17 +27,12 @@ st.markdown("""
     }
 
     .stApp { background-color: #ffffff; }
-    
-    /* Clean Sidebar */
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
     [data-testid="stSidebar"] * { color: #000000 !important; font-family: 'Inter', sans-serif; }
-
-    /* Hide redundant elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Typewriter Style */
     .typewriter-container {
         font-family: 'Inter', sans-serif;
         font-weight: 600;
@@ -75,7 +69,7 @@ def typewriter_effect():
 
             if (!isDeleting && charIndex === currentWord.length) {
                 isDeleting = true;
-                typeSpeed = 2000; // Pause at end
+                typeSpeed = 2000;
             } else if (isDeleting && charIndex === 0) {
                 isDeleting = false;
                 wordIndex = (wordIndex + 1) % words.length;
@@ -87,12 +81,7 @@ def typewriter_effect():
         type();
     </script>
     <style>
-        .typewriter-container {
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            font-size: 24px;
-            color: #000000;
-        }
+        .typewriter-container { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 24px; color: #000000; }
     </style>
     """
     components.html(html_code, height=50)
@@ -105,8 +94,13 @@ if "user_email" not in st.session_state:
     email_input = st.text_input("Email", placeholder="exemple@email.com")
     if st.button("Commencer"):
         if email_input:
-            st.session_state.user_email = email_input
-            st.rerun()
+            try:
+                # REGISTER USER IN SUPABASE
+                supabase.table("users").upsert({"email": email_input}).execute()
+                st.session_state.user_email = email_input
+                st.rerun()
+            except Exception as e:
+                st.error("Erreur de connexion à la base de données.")
         else:
             st.error("Veuillez entrer un email valide.")
     st.stop()
