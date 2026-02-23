@@ -12,157 +12,147 @@ try:
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
-st.set_page_config(page_title="KhirMinTaki", layout="wide", initial_sidebar_state="expanded")
+# --- 2. THE "CLEAN SLATE" UI ENGINE ---
+st.set_page_config(page_title="KhirMinTaki", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. AI-NATIVE DESIGN SYSTEM (CSS) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    /* Modern AI Reset */
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #1a1a1a; }
-    header, footer { visibility: hidden; }
-    
-    /* Clean Sidebar (Chat List Style) */
-    [data-testid="stSidebar"] { background-color: #f9f9f9 !important; border-right: 1px solid #f0f0f0; }
-    .sidebar-content { padding: 20px; }
-    .chat-thread-item { 
-        padding: 10px; border-radius: 8px; margin-bottom: 5px; 
-        font-size: 14px; color: #444; cursor: pointer; transition: 0.2s;
+    /* Global Aesthetic */
+    html, body, [class*="css"] { 
+        font-family: 'Inter', sans-serif !important; 
+        background-color: #ffffff !important; 
     }
-    .chat-thread-item:hover { background-color: #ececec; }
-
-    /* Centered Conversation Panel */
-    .main-chat-container { max-width: 800px; margin: 0 auto; padding-top: 20px; }
     
-    /* AI Header with Progress Bar */
+    /* Hide Streamlit Native Elements */
+    header, footer, [data-testid="stSidebarNav"] { visibility: hidden !important; }
+    [data-testid="stSidebar"] { background-color: #f9f9f9 !important; border-right: 1px solid #f0f0f0 !important; }
+
+    /* Centering the Welcome Screen */
+    .welcome-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 70vh;
+        text-align: center;
+    }
+
+    /* Fixed AI Header */
     .chat-header {
-        position: fixed; top: 0; width: 100%; background: rgba(255,255,255,0.9);
-        backdrop-filter: blur(10px); z-index: 1000; padding: 15px 0; border-bottom: 1px solid #f0f0f0;
+        position: fixed;
+        top: 0; left: 0; width: 100%;
+        background: white;
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        z-index: 99;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
-    .mastery-progress-bg { height: 4px; width: 100%; background: #f0f0f0; position: absolute; bottom: 0; }
-    .mastery-progress-fill { height: 4px; background: #10a37f; transition: width 0.5s ease; }
 
-    /* AI Message Styling */
-    .stChatMessage { background: transparent !important; border: none !important; }
-    
-    /* Interactive Cards & Chips */
-    .study-plan-chip {
-        display: inline-flex; align-items: center; gap: 8px;
-        background: #f0f7f4; color: #10a37f; padding: 8px 16px;
-        border-radius: 20px; border: 1px solid #d1e7dd;
-        font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 10px;
-    }
-    .exercise-card {
-        border: 1px solid #e5e5e5; border-radius: 12px; padding: 20px;
-        margin: 15px 0; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    /* Mastery Bar */
+    .mastery-container { width: 100%; height: 3px; background: #f0f0f0; position: fixed; top: 55px; left: 0; z-index: 100; }
+    .mastery-fill { height: 100%; background: #10a37f; transition: width 0.8s ease; }
+
+    /* Chat Input Area */
+    .stChatFloatingInputContainer {
+        max-width: 800px !important;
+        margin: 0 auto !important;
+        background: transparent !important;
     }
     
-    /* Hide scrollbars but keep functionality */
-    ::-webkit-scrollbar { width: 0px; background: transparent; }
+    /* Study Plan Chip */
+    .chip {
+        display: inline-block;
+        padding: 8px 16px;
+        background: #f0f7f4;
+        color: #10a37f;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        border: 1px solid #d1e7dd;
+        margin-top: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. SESSION & AUTH ---
+# --- 3. AUTHENTICATION ---
 if "user_email" not in st.session_state:
-    st.markdown("<div style='text-align:center; padding-top:100px;'><h1>KhirMinTaki</h1>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1.5, 1])
-    with c2:
-        email = st.text_input("Email", placeholder="email@example.com")
-        if st.button("Continue", use_container_width=True):
+    st.markdown("<div class='welcome-container'>", unsafe_allow_html=True)
+    st.markdown("<h1 style='font-size: 42px; font-weight: 800;'>KhirMinTaki</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #666; margin-bottom: 30px;'>Your personalized Tunisian AI Tutor.</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        email = st.text_input("Email", placeholder="me@example.com", label_visibility="collapsed")
+        if st.button("Start Learning", use_container_width=True):
             if email:
                 st.session_state.user_email = email
                 st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- 4. SIDEBAR (CHAPTERS AS CHAT THREADS) ---
+# --- 4. SIDEBAR (CHAT HISTORY STYLE) ---
 with st.sidebar:
-    st.markdown("<div style='font-weight:700; font-size:18px; margin-bottom:20px;'>KhirMinTaki</div>", unsafe_allow_html=True)
-    
-    st.markdown("<p style='font-size:11px; color:#999; font-weight:700;'>MATHEMATICS</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 18px; font-weight: 700; margin-bottom: 20px;'>Mathematics</h2>", unsafe_allow_html=True)
     try:
         chapters = supabase.table("chapters").select("*").execute().data
         for ch in chapters:
-            if st.button(f"💬 {ch['name']}", key=ch['id'], use_container_width=True):
+            if st.button(f"💬 {ch['name']}", key=f"btn_{ch['id']}", use_container_width=True):
                 st.session_state.current_chapter = ch['name']
                 st.session_state.chapter_id = ch['id']
-                st.session_state.messages = [] # Reset for new thread look
+                st.session_state.messages = [] # New thread
                 st.rerun()
-    except: st.error("Database connection error.")
-
-    st.markdown("---")
-    if st.button("Logout", use_container_width=True):
+    except:
+        st.error("DB Error")
+    
+    st.markdown("<div style='position: fixed; bottom: 20px;'>", unsafe_allow_html=True)
+    if st.button("Log out"):
         st.session_state.clear()
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 5. MAIN CONVERSATION ---
+# --- 5. MAIN WORKSPACE ---
 if "current_chapter" not in st.session_state:
-    st.markdown("<div style='height:40vh;'></div><h2 style='text-align:center; color:#ccc;'>Select a chapter to start chatting.</h2>", unsafe_allow_html=True)
+    # This is the "Blank Page" fix - Explicitly centering the content
+    st.markdown("<div class='welcome-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-weight: 700; color: #1a1a1a;'>How can I help you revise today?</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #888;'>Select a chapter from the sidebar on the left to start.</p>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Force open sidebar if they haven't picked a chapter
+    st.info("← Open the sidebar menu to pick a chapter.")
 else:
-    # 5.1 HEADER WITH MASTERY BAR
-    mastery = 42 # This would be pulled from Supabase
+    # Chapter Header & Mastery
+    mastery_val = 42 
     st.markdown(f"""
         <div class="chat-header">
-            <div style="max-width:800px; margin:0 auto; padding:0 20px; display:flex; justify-content:space-between;">
-                <span style="font-weight:600;">Mathematics — {st.session_state.current_chapter}</span>
-                <span style="color:#10a37f; font-weight:700;">Mastery: {mastery}%</span>
-            </div>
-            <div class="mastery-progress-bg"><div class="mastery-progress-fill" style="width:{mastery}%;"></div></div>
+            <span style="font-weight: 700; font-size: 14px;">Mathématiques — {st.session_state.current_chapter}</span>
+            <span style="color: #10a37f; font-weight: 700; font-size: 14px;">Mastery: {mastery_val}%</span>
         </div>
+        <div class="mastery-container"><div class="mastery-fill" style="width: {mastery_val}%;"></div></div>
+        <div style="height: 70px;"></div>
     """, unsafe_allow_html=True)
 
-    # 5.2 CHAT AREA
-    st.markdown("<div class='main-chat-container'>", unsafe_allow_html=True)
-    
-    # Load session state for the chapter
-    sess_res = supabase.table("student_sessions").select("*").eq("user_email", st.session_state.user_email).eq("chapter_id", st.session_state.chapter_id).execute()
-    if not sess_res.data:
-        supabase.table("student_sessions").insert({"user_email": st.session_state.user_email, "chapter_id": st.session_state.chapter_id, "phase": "assessment"}).execute()
-        st.rerun()
-    curr_sess = sess_res.data[0]
+    # Chat Logic
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": f"Before we begin **{st.session_state.current_chapter}**, tell me: what's your current level or what do you find hardest here?"}]
 
-    if not st.session_state.get("messages"):
-        st.session_state.messages = [{"role": "assistant", "content": f"Before we begin **{st.session_state.current_chapter}**, I need to understand your current level. How would you describe your understanding of this topic so far?"}]
+    # Create a container for chat to keep it centered
+    chat_container = st.container()
+    with chat_container:
+        col_left, col_mid, col_right = st.columns([1, 4, 1])
+        with col_mid:
+            for m in st.session_state.messages:
+                with st.chat_message(m["role"]):
+                    st.markdown(m["content"])
+                    if "[PLAN_READY]" in m["content"]:
+                        st.markdown("<div class='chip'>Study Plan Created ✓</div>", unsafe_allow_html=True)
 
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-            if "[PLAN_READY]" in m["content"]:
-                if st.button("Study Plan Created ✓"):
-                    st.session_state.show_panel = True
-
-    # 5.3 PANEL SLIDE-OVER (CONTROLLED BY STATE)
-    if st.session_state.get("show_panel"):
-        with st.sidebar: # Using sidebar as a temporary "right panel" simulator for stability
-            st.markdown("### Academic Records")
-            tab_p, tab_s, tab_e, tab_n = st.tabs(["Plan", "Summary", "Ex", "Notes"])
-            with tab_p: st.write(curr_sess.get("study_plan") or "Generating...")
-            with tab_s: st.write(curr_sess.get("course_resume") or "Empty...")
-            if st.button("Close Panel"): 
-                st.session_state.show_panel = False
-                st.rerun()
-
-    # 5.4 CHAT INPUT
+    # Input Fixed at Bottom
     if prompt := st.chat_input("Type your message..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
-        
-        with st.chat_message("assistant"):
-            sys_msg = "You are a modern AI tutor. Be clean, concise, and use LaTeX. If you've gathered enough info, trigger [PLAN_READY]."
-            try:
-                chat = groq_client.chat.completions.create(
-                    messages=[{"role": "system", "content": sys_msg}] + st.session_state.messages[-5:],
-                    model="llama-3.3-70b-versatile",
-                )
-                res = chat.choices[0].message.content
-            except:
-                res = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt).text
-            
-            st.markdown(res.replace("[PLAN_READY]", ""))
-            st.session_state.messages.append({"role": "assistant", "content": res})
-            
-            if "[PLAN_READY]" in res:
-                supabase.table("student_sessions").update({"study_plan": "Your custom plan based on our talk.", "phase": "teaching"}).eq("id", curr_sess["id"]).execute()
-                st.rerun()
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.rerun()
