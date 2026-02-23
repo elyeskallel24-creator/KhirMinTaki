@@ -50,7 +50,7 @@ def typewriter_effect():
     <div class="typewriter-container" id="typewriter"></div>
     <script>
         const textElement = document.getElementById("typewriter");
-        const words = ["KhirMinTaki", "Votre tuteur IA", "Apprentissage pur"];
+        const words = ["KhirMinTaki", "A9ra khir", "A9ra asra3"];
         let wordIndex = 0;
         let charIndex = 0;
         let isDeleting = false;
@@ -201,10 +201,9 @@ else:
                         st.write("### Feedback de l'IA")
                         st.markdown(response.text)
                         
-                        # THE LINKING FEATURE
-                        if st.button("Poser une question sur cette analyse"):
-                            st.session_state.messages.append({"role": "user", "content": "J'ai envoyé une photo de mon travail. Peux-tu m'expliquer davantage ta correction ?"})
+                        if st.button("Ajouter à la conversation"):
+                            st.session_state.messages.append({"role": "user", "content": "Peux-tu m'expliquer davantage cette correction ?"})
                             st.session_state.messages.append({"role": "assistant", "content": response.text})
-                            st.success("Analyse ajoutée à la conversation !")
+                            st.success("C'est fait !")
                     except Exception as e:
                         st.error("Erreur d'analyse. Assurez-vous que l'image est claire.")
