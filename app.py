@@ -74,20 +74,29 @@ chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Chapitres", ["Sélectionner..."] + chapter_names)
 
-# --- 6. DASHBOARD OR CHAPTER VIEW ---
+# --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
     name = st.session_state.user_email.split('@')[0].capitalize()
     st.write(f"### **Bienvenue, {name}**")
     st.write("Prêt pour une session d'apprentissage ? Choisissez un module à gauche.")
     
-    # Simple Progress Stats
     stats = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
     st.metric("Chapitres explorés", len(stats.data))
 
 else:
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     
-    # Load Data from Supabase
+    # NEW FEATURE: PROGRESS TRACKER
+    score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
+    if score_res.data:
+        latest_score = score_res.data[0]['score']
+        st.write(f"**Maîtrise du chapitre : {latest_score}%**")
+        st.progress(latest_score / 100)
+    else:
+        st.write("**Maîtrise du chapitre : 0%**")
+        st.progress(0.0)
+
+    # Load Course Data
     res = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
     if res.data:
         st.session_state.study_plan = res.data[0].get('study_plan')
@@ -96,19 +105,17 @@ else:
         st.session_state.study_plan = None
         st.session_state.resume = None
 
-    # TABS SYSTEM
     tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
 
-    # TAB 1: CHAT
+    # TAB 1: CONVERSATION
     with tab1:
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
         
-        if prompt := st.chat_input("Une question sur ce chapitre ?"):
+        if prompt := st.chat_input("Posez votre question..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
-            
             with st.chat_message("assistant"):
                 model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Tuteur expert. Style minimaliste. Pas d'emojis. Utilise LaTeX.")
                 response = model.generate_content(prompt)
@@ -121,42 +128,57 @@ else:
                     st.session_state.study_plan = plan
                     st.rerun()
 
-    # TAB 2: DOCUMENTS
+    # TAB 2: DOCUMENTS + PDF EXPORT
     with tab2:
         if st.session_state.study_plan:
-            st.subheader("Votre Plan d'étude")
+            st.subheader("Plan d'étude")
             st.markdown(st.session_state.study_plan)
-            st.divider()
             if st.session_state.resume:
-                st.subheader("Résumé du Cours")
+                st.divider()
+                st.subheader("Résumé")
                 st.markdown(st.session_state.resume)
             else:
-                if st.button("Générer un résumé complet"):
-                    with st.spinner("Rédaction du résumé..."):
-                        resume_text = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Résumé détaillé en LaTeX pour {selected_chapter}").text
+                if st.button("Générer un résumé"):
+                    with st.spinner("Rédaction..."):
+                        resume_text = genai.GenerativeModel("gemini-1.5-flash").generate_content(f"Résumé LaTeX pour {selected_chapter}").text
                         supabase.table("student_sessions").update({"course_resume": resume_text}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
                         st.session_state.resume = resume_text
                         st.rerun()
-        else:
-            st.info("Commencez la discussion dans l'onglet Conversation pour générer votre plan.")
 
-    # TAB 3: IMAGE ANALYSIS
+            # NEW FEATURE: PDF DOWNLOAD
+            if st.button("Télécharger le cours en PDF"):
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", size=12)
+                pdf.cell(200, 10, txt=f"KhirMinTaki - {selected_chapter}", ln=True, align='C')
+                pdf.ln(10)
+                if st.session_state.study_plan:
+                    pdf.multi_cell(0, 10, txt="--- PLAN D'ETUDE ---")
+                    pdf.multi_cell(0, 10, txt=st.session_state.study_plan.encode('latin-1', 'replace').decode('latin-1'))
+                if st.session_state.resume:
+                    pdf.ln(10)
+                    pdf.multi_cell(0, 10, txt="--- RESUME DU COURS ---")
+                    pdf.multi_cell(0, 10, txt=st.session_state.resume.encode('latin-1', 'replace').decode('latin-1'))
+                pdf_output = pdf.output(dest='S').encode('latin-1')
+                st.download_button(label="Cliquer ici pour télécharger", data=pdf_output, file_name=f"{selected_chapter}.pdf", mime="application/pdf")
+        else:
+            st.info("Lancez la conversation pour débloquer les documents.")
+
+    # TAB 3: PHOTO ANALYSIS
     with tab3:
-        st.subheader("Correction de Photo")
-        img_file = st.file_uploader("Upload ton exercice", type=["jpg", "png", "jpeg"])
+        img_file = st.file_uploader("Upload", type=["jpg", "png", "jpeg"])
         if img_file:
             img = Image.open(img_file)
             st.image(img, width=400)
-            if st.button("Analyser mon travail"):
-                with st.spinner("KhirMinTaki lit ton écriture..."):
-                    vision_res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail de maths sur {selected_chapter}. Utilise LaTeX.", img])
-                    st.markdown(vision_res.text)
+            if st.button("Analyser"):
+                with st.spinner("Analyse..."):
+                    res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail sur {selected_chapter}. LaTeX.", img])
+                    st.markdown(res.text)
 
     # TAB 4: QUIZ EXPRESS
     with tab4:
-        st.subheader("Quiz de Maîtrise")
-        if st.button("Nouveau Quiz"):
-            with st.spinner("Préparation des questions..."):
+        if st.button("Générer un Quiz"):
+            with st.spinner("Chargement..."):
                 q_prompt = f"Génère 3 questions MCQ sur {selected_chapter}. Format JSON: [{{'question':'','options':['','',''],'answer':'','explication':''}}]"
                 raw = genai.GenerativeModel("gemini-1.5-flash").generate_content(q_prompt).text
                 st.session_state.current_quiz = json.loads(raw.replace('```json','').replace('```',''))
@@ -168,12 +190,12 @@ else:
             for i, q in enumerate(st.session_state.current_quiz):
                 u_answers.append(st.radio(q['question'], q['options'], key=f"qz_{i}"))
             
-            if st.button("Soumettre"):
+            if st.button("Valider"):
                 st.session_state.quiz_done = True
                 for i, q in enumerate(st.session_state.current_quiz):
                     if u_answers[i] == q['answer']:
                         st.success(f"Q{i+1} Correct!"); score += 1
-                    else: st.error(f"Q{i+1} Faux. C'était {q['answer']}. {q['explication']}")
+                    else: st.error(f"Q{i+1} Faux. C'était {q['answer']}")
                 
                 final = int((score/3)*100)
                 st.write(f"### Score: {final}%")
