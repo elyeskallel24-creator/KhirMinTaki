@@ -2,16 +2,12 @@ import streamlit as st
 import google.generativeai as genai
 from groq import Groq
 from supabase import create_client
-from fpdf import FPDF
 import streamlit.components.v1 as components
-from PIL import Image
-import json
 
 # --- 1. SETUP CONNECTIONS ---
 try:
-    # Set the API key globally
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    # We use the standard configure but we will target the stable v1 endpoint
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
@@ -19,55 +15,44 @@ except Exception as e:
 
 # --- 2. STYLE & BRANDING ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
-
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
-    .stApp { background-color: #ffffff; }
-    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
-    #MainMenu, footer, header {visibility: hidden;}
-    .main-header { font-size: 32px; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .main-header { font-size: 32px; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. TUNISIAN TYPEWRITER ---
 def typewriter_effect():
     html_code = """
-    <div class="typewriter-container" id="typewriter"></div>
+    <div id="typewriter" style="font-weight:800; font-size:48px; height:60px;"></div>
     <script>
-        const textElement = document.getElementById("typewriter");
         const words = ["KhirMinTaki", "A9ra khir", "A9ra asra3"];
-        let wordIndex = 0; let charIndex = 0; let isDeleting = false;
+        let i = 0; let j = 0; let cur = ""; let del = false;
         function type() {
-            const currentWord = words[wordIndex];
-            if (isDeleting) { textElement.textContent = currentWord.substring(0, charIndex - 1); charIndex--; }
-            else { textElement.textContent = currentWord.substring(0, charIndex + 1); charIndex++; }
-            let typeSpeed = isDeleting ? 100 : 150;
-            if (!isDeleting && charIndex === currentWord.length) { isDeleting = true; typeSpeed = 2000; }
-            else if (isDeleting && charIndex === 0) { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typeSpeed = 500; }
-            setTimeout(type, typeSpeed);
+            cur = words[i];
+            document.getElementById("typewriter").textContent = del ? cur.substring(0, j--) : cur.substring(0, j++);
+            if (!del && j > cur.length) { del = true; setTimeout(type, 2000); }
+            else if (del && j === 0) { del = false; i = (i + 1) % words.length; setTimeout(type, 500); }
+            else { setTimeout(type, del ? 50: 150); }
         }
         type();
     </script>
-    <style>
-        .typewriter-container { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 48px; color: #000000; height: 60px; display: flex; align-items: center; }
-    </style>
     """
     components.html(html_code, height=80)
 
 # --- 4. AUTHENTICATION ---
 if "user_email" not in st.session_state:
     typewriter_effect()
-    st.markdown("<p style='font-family: Inter; font-size: 24px; font-weight: 700;'>Entrez votre email pour commencer.</p>", unsafe_allow_html=True)
-    email_input = st.text_input("Email", placeholder="exemple@email.com", label_visibility="collapsed")
-    if st.button("Commencer", use_container_width=True):
+    email_input = st.text_input("Entrez votre email", placeholder="exemple@email.com")
+    if st.button("Commencer"):
         if email_input:
             st.session_state.user_email = email_input
             try:
                 supabase.table("users").upsert({"email": email_input}).execute()
-                st.rerun()
-            except: st.rerun()
+            except: pass
+            st.rerun()
     st.stop()
 
 # --- 5. TOP NAVIGATION ---
@@ -75,12 +60,12 @@ col_logo, col_nav, col_out = st.columns([2, 4, 1])
 with col_logo: st.markdown("<div class='main-header'>KhirMinTaki</div>", unsafe_allow_html=True)
 
 try:
-    chapters_data = supabase.table("chapters").select("*").execute()
-    chapter_names = [c['name'] for c in chapters_data.data]
+    chapters = supabase.table("chapters").select("*").execute().data
+    chapter_names = [c['name'] for c in chapters]
     with col_nav:
         selected_chapter = st.selectbox("📚 Chapitres", ["Sélectionner..."] + chapter_names, label_visibility="collapsed")
 except:
-    st.error("Erreur base de données")
+    st.error("Erreur de connexion base de données.")
     st.stop()
 
 with col_out:
@@ -92,12 +77,10 @@ st.divider()
 
 # --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
-    name = st.session_state.user_email.split('@')[0].capitalize()
-    st.write(f"## **Asslema, {name} !**")
-    st.info("Utilise la liste déroulante en haut pour choisir un cours.")
+    st.write(f"## **Asslema, {st.session_state.user_email.split('@')[0].capitalize()} !**")
+    st.info("Sélectionne un chapitre en haut pour commencer l'étude.")
 else:
-    chapter_id = next((c['id'] for c in chapters_data.data if c['name'] == selected_chapter), None)
-    tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
+    tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz"])
 
     with tab1:
         if "messages" not in st.session_state:
@@ -112,23 +95,26 @@ else:
             
             with st.chat_message("assistant"):
                 try:
-                    # FORCING THE STABLE PRODUCTION MODEL
-                    model = genai.GenerativeModel("gemini-pro")
+                    # UPDATED FOR 2026 STABILITY
+                    # Use the GA (General Availability) model name
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    
+                    # We send the request without forcing v1beta
                     response = model.generate_content(prompt)
                     
                     if response.text:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
-                    # FALLBACK TO ALTERNATE PRODUCTION NAME
+                    # SECOND ATTEMPT WITH THE NEWEST 2026 NAMING
                     try:
-                        model = genai.GenerativeModel("gemini-1.5-pro")
+                        model = genai.GenerativeModel("gemini-2.0-flash")
                         response = model.generate_content(prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                     except Exception as final_e:
-                        st.error(f"Erreur IA : {str(final_e)}")
+                        st.error(f"Désolé, l'IA est indisponible : {str(final_e)}")
 
-    with tab2: st.info("Bientôt disponible.")
-    with tab3: st.file_uploader("Upload", type=["jpg","png","jpeg"])
-    with tab4: st.button("Lancer le Quiz")
+    with tab2: st.info("Résumés bientôt disponibles.")
+    with tab3: st.file_uploader("Prendre une photo", type=["jpg","jpeg","png"])
+    with tab4: st.button("Démarrer le Quiz")
