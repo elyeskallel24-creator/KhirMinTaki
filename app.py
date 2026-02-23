@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 from PIL import Image
 import json
 
-# --- 1. SETUP CONNECTIONS (WITH DEBUG ERROR) ---
+# --- 1. SETUP CONNECTIONS ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -15,7 +15,7 @@ try:
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
-# --- 2. STYLE & BRANDING ---
+# --- 2. STYLE & BRANDING (SIDEBAR FIX INCLUDED) ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
@@ -24,6 +24,16 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
+    
+    /* FIX: Make the sidebar collapse/expand button visible when hidden */
+    [data-testid="collapsedControl"] {
+        background-color: #f0f2f6;
+        border-radius: 0 10px 10px 0;
+        padding: 5px;
+        top: 60px; /* Positioned slightly lower so it doesn't overlap header */
+        border: 1px solid #d1d5db;
+    }
+
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -61,7 +71,7 @@ def typewriter_effect():
     """
     components.html(html_code, height=80)
 
-# --- 4. AUTHENTICATION (WITH DEBUG ERROR) ---
+# --- 4. AUTHENTICATION ---
 if "user_email" not in st.session_state:
     typewriter_effect()
     st.markdown("<p style='font-family: Inter; font-size: 28px; font-weight: 700;'>Bienvenue. Entrez votre email.</p>", unsafe_allow_html=True)
@@ -70,7 +80,6 @@ if "user_email" not in st.session_state:
     if st.button("Commencer", use_container_width=True):
         if email_input:
             try:
-                # This tries to save the email. If it fails, it shows the exact error.
                 supabase.table("users").upsert({"email": email_input}).execute()
                 st.session_state.user_email = email_input
                 st.rerun()
@@ -146,7 +155,7 @@ else:
                     st.session_state.study_plan = plan_res
                     st.rerun()
 
-    # TAB 2: DOCUMENTS + PDF EXPORT
+    # TAB 2: DOCUMENTS
     with tab2:
         if st.session_state.study_plan:
             st.subheader("Plan d'étude")
@@ -162,24 +171,16 @@ else:
                         supabase.table("student_sessions").update({"course_resume": resume_text}).eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
                         st.session_state.resume = resume_text
                         st.rerun()
-
-            if st.button("Télécharger le cours en PDF"):
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", size=12)
-                pdf.cell(200, 10, txt=f"KhirMinTaki - {selected_chapter}", ln=True, align='C')
-                pdf.ln(10)
-                if st.session_state.study_plan:
-                    pdf.multi_cell(0, 10, txt="--- PLAN D'ETUDE ---")
-                    pdf.multi_cell(0, 10, txt=st.session_state.study_plan.encode('latin-1', 'replace').decode('latin-1'))
-                if st.session_state.resume:
-                    pdf.ln(10)
-                    pdf.multi_cell(0, 10, txt="--- RESUME DU COURS ---")
-                    pdf.multi_cell(0, 10, txt=st.session_state.resume.encode('latin-1', 'replace').decode('latin-1'))
-                pdf_output = pdf.output(dest='S').encode('latin-1')
-                st.download_button(label="Cliquer ici pour télécharger", data=pdf_output, file_name=f"{selected_chapter}.pdf", mime="application/pdf")
-        else:
-            st.info("Lancez la conversation pour débloquer les documents.")
+            
+            # PDF Download
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt=f"KhirMinTaki - {selected_chapter}", ln=True, align='C')
+            if st.session_state.study_plan:
+                pdf.multi_cell(0, 10, txt=st.session_state.study_plan.encode('latin-1', 'replace').decode('latin-1'))
+            pdf_output = pdf.output(dest='S').encode('latin-1')
+            st.download_button(label="Télécharger PDF", data=pdf_output, file_name=f"{selected_chapter}.pdf")
 
     # TAB 3: PHOTO ANALYSIS
     with tab3:
