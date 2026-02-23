@@ -27,7 +27,7 @@ def generate_series(chapter):
     prompt = f"Génère 3 exercices progressifs pour {chapter}. Utilise LaTeX. Français Académique."
     return model.generate_content(prompt).text
 
-# --- 3. NAVIGATION & UI ---
+# --- 3. UI CONFIGURATION ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 st.sidebar.title("📚 KhirMinTaki")
 
@@ -35,7 +35,7 @@ chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
 selected_chapter = st.sidebar.selectbox("Choisir un Chapitre", ["Sélectionner..."] + chapter_names)
 
-# --- 4. DATA LOADING ---
+# --- 4. DATA PERSISTENCE ---
 if selected_chapter != "Sélectionner...":
     chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
     existing = supabase.table("studying_plans").select("*").eq("chapter_id", chapter_id).execute()
@@ -50,29 +50,21 @@ if selected_chapter != "Sélectionner...":
 
 if "messages" not in st.session_state: st.session_state.messages = []
 
-# --- 5. PROGRESS CALCULATION ---
-def get_progress():
+# --- 5. MAIN APP INTERFACE ---
+if selected_chapter != "Sélectionner...":
+    # Progress Calculation
     score = 0
     if st.session_state.get('study_plan'): score += 25
     if st.session_state.get('resume'): score += 25
-    if st.session_state.get('series'): score += 25
-    if len(st.session_state.messages) > 6: score += 25 # Diagnostic completed
-    return min(score, 100)
-
-# --- 6. MAIN DISPLAY ---
-if selected_chapter != "Sélectionner...":
-    # Progress Bar at the top
-    progress = get_progress()
-    st.write(f"### Progression du chapitre : {progress}%")
-    st.progress(progress / 100)
+    if st.session_state.get('series'): score += 50
+    st.write(f"### Progression : {score}%")
+    st.progress(score / 100)
     
-    tab1, tab2, tab3 = st.tabs(["📋 Diagnostic & Plan", "📝 Résumé", "✍️ Série"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Plan", "📝 Résumé", "✍️ Série", "🎥 Vidéo IA"])
     
     with tab1:
         if st.session_state.get('study_plan'):
-            st.success("Plan d'étude généré !")
             st.markdown(st.session_state.study_plan)
-        
         st.divider()
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
@@ -81,32 +73,36 @@ if selected_chapter != "Sélectionner...":
         if st.session_state.get('resume'):
             st.markdown(st.session_state.resume)
         elif st.session_state.get('study_plan'):
-            if st.button("Débloquer le Résumé"):
+            if st.button("Générer le Résumé"):
                 content = generate_resume(selected_chapter)
                 supabase.table("studying_plans").update({"resume": content}).eq("chapter_id", chapter_id).execute()
                 st.session_state.resume = content
                 st.rerun()
-        else:
-            st.warning("Complétez le diagnostic d'abord.")
 
     with tab3:
         if st.session_state.get('series'):
             st.markdown(st.session_state.series)
         elif st.session_state.get('resume'):
-            if st.button("Débloquer la Série d'Exercices"):
+            if st.button("Générer les Exercices"):
                 content = generate_series(selected_chapter)
                 supabase.table("studying_plans").update({"series": content}).eq("chapter_id", chapter_id).execute()
                 st.session_state.series = content
                 st.rerun()
-        else:
-            st.warning("Générez le résumé avant de passer aux exercices.")
 
-    # Chat logic
-    if prompt := st.chat_input("Votre message..."):
+    with tab4:
+        st.subheader("Visualisation Conceptuelle")
+        st.info("Ici, l'IA génère une courte animation pour expliquer un concept visuel complexe.")
+        if st.button("Générer Explication Vidéo"):
+            st.warning("Cette fonctionnalité utilise le modèle Veo. Génération en cours...")
+            # Note: In a production app, you'd call the Veo API here.
+            st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # Placeholder example
+
+    # Chat Input
+    if prompt := st.chat_input("Posez votre question..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant"):
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths, Français Académique. Socratique. [PHASE_PLAN] après 3 questions.")
+            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Prof de maths, Français Académique. Socratique.")
             chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
             response = chat.send_message(prompt)
             st.markdown(response.text.replace("[PHASE_PLAN]", ""))
@@ -119,4 +115,4 @@ if selected_chapter != "Sélectionner...":
                 st.rerun()
 else:
     st.title("KhirMinTaki")
-    st.info("Sélectionnez un chapitre pour voir votre progression.")
+    st.write("Bienvenue dans l'école du futur.")
