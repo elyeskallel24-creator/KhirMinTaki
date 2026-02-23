@@ -12,46 +12,27 @@ try:
 except Exception as e:
     st.error("Connection Error: Check Secrets.")
 
-# --- 2. THE CHATGPT AESTHETIC (ULTRA MINIMAL) ---
+# --- 2. ULTRA MINIMALIST CSS ---
 st.set_page_config(page_title="KhirMinTaki", layout="wide")
 
 st.markdown("""
     <style>
-    /* Global White Background */
     .stApp { background-color: #ffffff; color: #000000; }
-    
-    /* Clean Sidebar */
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
     [data-testid="stSidebar"] * { color: #000000 !important; }
-
-    /* Hide redundant elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Typography & Stats */
-    h1, h2, h3 { font-weight: 400 !important; letter-spacing: -0.5px; }
+    h1, h2, h3 { font-weight: 400 !important; }
     .small-stat { font-size: 14px; color: #666666; margin-bottom: 5px; }
     .stat-value { font-size: 18px; font-weight: 500; color: #000000; }
-    
-    /* Input & Buttons */
     .stChatInputContainer { border-top: 1px solid #f0f0f0 !important; }
-    .stButton>button {
-        border: 1px solid #e5e5e5;
-        background: #ffffff;
-        color: #000000;
-        border-radius: 5px;
-        padding: 5px 15px;
-        font-size: 14px;
-    }
-    
-    /* Chat Messages */
-    .stChatMessage { border: none !important; background: transparent !important; padding-top: 2rem !important; }
+    .stChatMessage { border: none !important; background: transparent !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. STATS & NAV ---
-st.sidebar.title("KhirMinTaki")
+st.sidebar.markdown("### **KHIRMINTAKI**") 
 
 chapters_data = supabase.table("chapters").select("*").execute()
 chapter_names = [c['name'] for c in chapters_data.data]
@@ -66,11 +47,10 @@ except:
 
 # --- 4. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
-    st.write("### Bienvenue")
+    st.write("### **Bienvenue**") 
     st.write("Sélectionnez un module pour commencer votre session d'apprentissage.")
     
     st.divider()
-    # Tiny, Subtle Stats
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<p class="small-stat">Niveau</p>', unsafe_allow_html=True)
@@ -102,18 +82,18 @@ else:
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
         
-        if prompt := st.chat_input("Posez une question ou répondez..."):
+        if prompt := st.chat_input("..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Tu es un tuteur de mathématiques. Style minimaliste, précis, noir et blanc. Pas d'emojis. Utilise LaTeX pour les formules.")
+                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Tuteur de maths. Style minimaliste. Pas d'emojis. Utilise LaTeX.")
                 chat = model.start_chat(history=[{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
                 response = chat.send_message(prompt)
                 st.markdown(response.text.replace("[PHASE_PLAN]", ""))
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 
                 if "[PHASE_PLAN]" in response.text and not st.session_state.get('study_plan'):
-                    plan_prompt = f"Génère un plan d'étude minimaliste pour {selected_chapter}."
+                    plan_prompt = f"Génère un plan d'étude pour {selected_chapter}."
                     plan = genai.GenerativeModel("gemini-1.5-flash").generate_content(plan_prompt).text
                     supabase.table("student_sessions").insert({"chapter_id": chapter_id, "study_plan": plan}).execute()
                     st.session_state.study_plan = plan
@@ -123,17 +103,14 @@ else:
         if st.session_state.get('study_plan'):
             st.write("### Plan d'étude")
             st.markdown(st.session_state.study_plan)
-            
             if st.session_state.get('resume'):
                 st.divider()
                 st.write("### Résumé")
                 st.markdown(st.session_state.resume)
             else:
                 if st.button("Générer le résumé"):
-                    res_prompt = f"Rédige un résumé LaTeX pour {selected_chapter}."
+                    res_prompt = f"Résumé LaTeX pour {selected_chapter}."
                     content = genai.GenerativeModel("gemini-1.5-flash").generate_content(res_prompt).text
                     supabase.table("student_sessions").update({"course_resume": content}).eq("chapter_id", chapter_id).execute()
                     st.session_state.resume = content
                     st.rerun()
-        else:
-            st.write("Le plan apparaîtra ici après le diagnostic.")
