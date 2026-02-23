@@ -11,17 +11,17 @@ try:
 except Exception as e:
     st.error("Connection Error: Check if your Secrets are set up correctly!")
 
-# --- 2. THE PLANNING FUNCTION ---
+# --- 2. AI FUNCTIONS ---
 def generate_study_plan(history, chapter):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"""
-    En tant que professeur expert, analyse cette conversation de diagnostic pour le chapitre {chapter}.
-    Crée un 'Studying Plan' personnalisé en 4 étapes clés.
-    Chaque étape doit être concise et adaptée au niveau montré par l'élève.
-    Formatte le résultat en Markdown avec des cases à cocher (- [ ]).
-    Langue : Français Académique.
-    """
+    prompt = f"Analyse ce diagnostic pour le chapitre {chapter}. Crée un plan d'étude de 4 étapes avec des cases à cocher (- [ ]). Français Académique."
     response = model.generate_content([prompt, str(history)])
+    return response.text
+
+def generate_resume(chapter):
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    prompt = f"Rédige un résumé de cours complet et structuré pour le chapitre de mathématiques : {chapter}. Inclus les formules clés et les définitions essentielles. Français Académique."
+    response = model.generate_content(prompt)
     return response.text
 
 # --- 3. NAVIGATION & UI ---
@@ -38,17 +38,34 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "study_plan" not in st.session_state:
     st.session_state.study_plan = None
+if "resume" not in st.session_state:
+    st.session_state.resume = None
 
 # --- 5. MAIN LOGIC ---
 if selected_chapter != "Sélectionner...":
-    st.title(f"📖 Chapitre : {selected_chapter}")
+    st.title(f"📖 {selected_chapter}")
     
-    # If a study plan exists, show it at the top
+    # UI Layout: Plan and Resume side-by-side
+    col1, col2 = st.columns(2)
+    
     if st.session_state.study_plan:
-        with st.expander("✅ Votre Plan d'Étude Personnalisé", expanded=True):
-            st.markdown(st.session_state.study_plan)
+        with col1:
+            with st.expander("✅ Plan d'Étude", expanded=True):
+                st.markdown(st.session_state.study_plan)
+    
+    if st.session_state.study_plan and st.session_state.resume is None:
+        if st.button("Générer le Résumé de Cours"):
+            with st.spinner("Rédaction du résumé..."):
+                st.session_state.resume = generate_resume(selected_chapter)
+                st.rerun()
 
-    # Display chat history
+    if st.session_state.resume:
+        with col2:
+            with st.expander("📝 Résumé du Cours", expanded=True):
+                st.markdown(st.session_state.resume)
+
+    # Chat Display
+    st.divider()
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"].replace("[PHASE_PLAN]", ""))
@@ -60,28 +77,16 @@ if selected_chapter != "Sélectionner...":
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            system_prompt = f"""
-            Tu es un professeur de mathématiques tunisien pour le chapitre : {selected_chapter}.
-            Pose 3 questions de diagnostic une par une. 
-            À la fin de la 3ème réponse, ajoute impérativement : [PHASE_PLAN]
-            Langue : Français Académique.
-            """
+            system_prompt = f"Tu es un professeur de maths pour {selected_chapter}. Pose 3 questions de diagnostic. À la fin de la 3ème, ajoute : [PHASE_PLAN]. Français Académique."
             model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
-            
             history = [{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]]
             chat_session = model.start_chat(history=history)
             response = chat_session.send_message(prompt)
-            
             st.markdown(response.text.replace("[PHASE_PLAN]", ""))
             st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-            # TRIGGER: Generate Plan if tag is detected
             if "[PHASE_PLAN]" in response.text and st.session_state.study_plan is None:
-                with st.spinner("Génération de votre plan d'étude..."):
-                    plan = generate_study_plan(st.session_state.messages, selected_chapter)
-                    st.session_state.study_plan = plan
-                    st.rerun()
-
+                st.session_state.study_plan = generate_study_plan(st.session_state.messages, selected_chapter)
+                st.rerun()
 else:
     st.title("Bienvenue sur KhirMinTaki")
-    st.write("Sélectionnez un chapitre pour commencer votre évaluation.")
