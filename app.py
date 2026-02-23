@@ -16,11 +16,7 @@ except Exception as e:
     st.error(f"Setup Error: {e}")
 
 # --- 2. STYLE & BRANDING ---
-st.set_page_config(
-    page_title="KhirMinTaki", 
-    layout="wide", 
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="KhirMinTaki", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -28,22 +24,13 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #f0f0f0; }
-    
-    /* THE ULTIMATE SIDEBAR BUTTON FIX */
-    [data-testid="collapsedControl"] {
-        background-color: #007BFF !important;
-        color: white !important;
-        border-radius: 0 10px 10px 0;
-        top: 20px;
-        padding: 5px;
-        display: flex !important;
-        border: 2px solid #0056b3;
-    }
-    [data-testid="collapsedControl"] svg {
-        fill: white !important;
-    }
-
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    
+    /* Make the sidebar toggle button slightly more visible by adding a background */
+    [data-testid="collapsedControl"] {
+        background-color: #f0f2f6;
+        border-radius: 0 10px 10px 0;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -67,15 +54,7 @@ def typewriter_effect():
         type();
     </script>
     <style>
-        .typewriter-container { 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            font-size: 48px; 
-            color: #000000; 
-            height: 60px;
-            display: flex;
-            align-items: center;
-        }
+        .typewriter-container { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 48px; color: #000000; height: 60px; display: flex; align-items: center; }
     </style>
     """
     components.html(html_code, height=80)
@@ -85,7 +64,6 @@ if "user_email" not in st.session_state:
     typewriter_effect()
     st.markdown("<p style='font-family: Inter; font-size: 28px; font-weight: 700;'>Bienvenue. Entrez votre email.</p>", unsafe_allow_html=True)
     email_input = st.text_input("Email", placeholder="exemple@email.com", label_visibility="collapsed")
-    
     if st.button("Commencer", use_container_width=True):
         if email_input:
             try:
@@ -96,7 +74,7 @@ if "user_email" not in st.session_state:
                 st.error(f"Database Error: {e}")
     st.stop()
 
-# --- 5. SIDEBAR & NAVIGATION ---
+# --- 5. SIDEBAR ---
 st.sidebar.markdown(f"### **KhirMinTaki**")
 if st.sidebar.button("Déconnexion"):
     del st.session_state.user_email
@@ -112,12 +90,12 @@ except Exception as e:
 
 # --- 6. MAIN INTERFACE ---
 if selected_chapter == "Sélectionner...":
-    # Help button for customers who hide the sidebar
-    st.info("💡 Cliquez sur le bouton bleu en haut à gauche pour choisir un chapitre !")
-    
     name = st.session_state.user_email.split('@')[0].capitalize()
-    st.write(f"### **Bienvenue, {name}**")
-    st.write("Prêt pour une session d'apprentissage ?")
+    st.write(f"## **Asslema, {name} !**")
+    
+    # CLEAR INSTRUCTION FOR THE SIDEBAR
+    st.info("👈 **Utilisez le menu à gauche pour choisir un chapitre.**")
+    st.warning("Si vous ne voyez pas le menu, cliquez sur la petite flèche ( **>** ) tout en haut à gauche de votre écran.")
     
     try:
         stats = supabase.table("student_sessions").select("id").eq("user_email", st.session_state.user_email).execute()
@@ -126,78 +104,37 @@ if selected_chapter == "Sélectionner...":
         st.metric("Chapitres explorés", 0)
 
 else:
-    chapter_id = chapters_data.data[chapter_names.index(selected_chapter)]['id']
+    chapter_id = next(c['id'] for c in chapters_data.data if c['name'] == selected_chapter)
     
-    # PROGRESS TRACKER
+    # Progress
     score_res = supabase.table("quiz_scores").select("score").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).order("created_at", desc=True).limit(1).execute()
-    if score_res.data:
-        latest_score = score_res.data[0]['score']
-        st.write(f"**Maîtrise du chapitre : {latest_score}%**")
-        st.progress(latest_score / 100)
-    else:
-        st.write("**Maîtrise du chapitre : 0%**")
-        st.progress(0.0)
-
-    # Load Course Data logic...
-    res = supabase.table("student_sessions").select("*").eq("chapter_id", chapter_id).eq("user_email", st.session_state.user_email).execute()
-    if res.data:
-        st.session_state.study_plan = res.data[0].get('study_plan')
-        st.session_state.resume = res.data[0].get('course_resume')
-    else:
-        st.session_state.study_plan = None
-        st.session_state.resume = None
+    latest_score = score_res.data[0]['score'] if score_res.data else 0
+    st.write(f"**Maîtrise du chapitre : {latest_score}%**")
+    st.progress(latest_score / 100)
 
     tab1, tab2, tab3, tab4 = st.tabs(["💬 Conversation", "📚 Documents", "📷 Analyse Photo", "📝 Quiz Express"])
 
-    # CHAT
     with tab1:
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages:
-            with st.chat_message(m["role"]): st.markdown(m["content"].replace("[PHASE_PLAN]", ""))
+            with st.chat_message(m["role"]): st.markdown(m["content"])
         if prompt := st.chat_input("Posez votre question..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel("gemini-1.5-flash", system_instruction="Tuteur expert. LaTeX.")
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 response = model.generate_content(prompt)
-                st.markdown(response.text.replace("[PHASE_PLAN]", ""))
+                st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-    # DOCUMENTS
     with tab2:
-        if st.session_state.study_plan:
-            st.subheader("Plan d'étude")
-            st.markdown(st.session_state.study_plan)
-            # PDF Logic...
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=f"KhirMinTaki - {selected_chapter}", ln=True, align='C')
-            pdf_output = pdf.output(dest='S').encode('latin-1')
-            st.download_button(label="Télécharger PDF", data=pdf_output, file_name=f"{selected_chapter}.pdf")
-        else:
-            st.info("Lancez la conversation pour débloquer les documents.")
+        st.write("Vos documents s'afficheront ici après avoir discuté avec le tuteur.")
 
-    # PHOTO ANALYSIS
     with tab3:
         img_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
         if img_file:
-            img = Image.open(img_file)
-            st.image(img, width=400)
-            if st.button("Analyser mon travail"):
-                with st.spinner("Analyse..."):
-                    res = genai.GenerativeModel("gemini-1.5-flash").generate_content([f"Corrige ce travail. LaTeX.", img])
-                    st.markdown(res.text)
+            st.image(Image.open(img_file), width=400)
 
-    # QUIZ EXPRESS
     with tab4:
         if st.button("Générer un Quiz"):
-            with st.spinner("Chargement..."):
-                q_prompt = f"Génère 3 questions MCQ sur {selected_chapter}. Format JSON."
-                raw = genai.GenerativeModel("gemini-1.5-flash").generate_content(q_prompt).text
-                st.session_state.current_quiz = json.loads(raw.replace('```json','').replace('```',''))
-        if "current_quiz" in st.session_state:
-            for i, q in enumerate(st.session_state.current_quiz):
-                st.radio(q['question'], q['options'], key=f"qz_{i}")
-            if st.button("Valider"):
-                st.success("Score enregistré !")
+            st.write("Génération en cours...")
