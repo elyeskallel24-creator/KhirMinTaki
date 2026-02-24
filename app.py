@@ -25,7 +25,6 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     header, footer { visibility: hidden; }
-    
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
@@ -53,10 +52,22 @@ def show_bac_selection():
 
 def show_level_audit():
     st.markdown(f"## Niveau : {st.session_state.user_data['bac_type']}")
-    subjects = ["Mathématiques", "Physique", "Sciences", "Anglais", "Français"]
+    
+    # Get subjects for the specific bac to audit them
+    bac_mapping = {
+        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique"],
+        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique"],
+        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique"],
+        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français"]
+    }
+    
+    current_bac = st.session_state.user_data['bac_type']
+    subjects_to_audit = bac_mapping.get(current_bac, ["Mathématiques", "Français"])
+    
     levels = {}
-    for sub in subjects:
+    for sub in subjects_to_audit:
         levels[sub] = st.select_slider(f"{sub}", options=["Faible", "Intermédiaire", "Excellent"], value="Intermédiaire")
+    
     if st.button("Suivant", use_container_width=True):
         st.session_state.user_data["levels"] = levels
         st.session_state.step = "philosophy"
@@ -64,7 +75,7 @@ def show_level_audit():
 
 def show_philosophy():
     st.markdown("## Votre style d'apprentissage")
-    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150)
+    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, placeholder="Ex: Sois patient, utilise des exemples concrets, donne moi des astuces...")
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
         st.session_state.step = "dashboard"
@@ -86,15 +97,22 @@ def show_subject_hub():
     if st.button("← Retour au Dashboard"):
         st.session_state.step = "dashboard"
         st.rerun()
+    
     st.markdown(f"## AI Professor: {st.session_state.user_data['bac_type']}")
-    
-    bac = st.session_state.user_data['bac_type']
-    subs = ["Mathématiques", "Physique", "Sciences", "Philosophie"] if bac == "Mathématiques" else ["Sciences", "Physique", "Mathématiques", "Français"]
-    
-    cols = st.columns(2)
+    st.write("Sélectionnez une matière pour commencer votre diagnostic.")
+
+    bac_mapping = {
+        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
+        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
+        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
+        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹", "Dessin"]
+    }
+
+    subs = bac_mapping.get(st.session_state.user_data['bac_type'], [])
+    cols = st.columns(3)
     for i, sub in enumerate(subs):
-        with cols[i % 2]:
-            if st.button(f"📘 {sub}", use_container_width=True):
+        with cols[i % 3]:
+            if st.button(f"📘 {sub}", key=f"sub_{sub}", use_container_width=True):
                 st.session_state.selected_subject = sub
                 st.session_state.step = "chat_diagnose"
                 st.session_state.messages = []
@@ -102,9 +120,8 @@ def show_subject_hub():
 
 def show_chat_diagnose():
     st.markdown(f"### 👨‍🏫 Tuteur de {st.session_state.selected_subject}")
-    
     if not st.session_state.get("messages"):
-        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
+        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous aujourd'hui ?"
         st.session_state.messages = [{"role": "assistant", "content": intro}]
 
     for m in st.session_state.messages:
