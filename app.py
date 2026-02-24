@@ -19,6 +19,29 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
+# SUBJECT MAPPING (The Brain of the Curriculum)
+BAC_MAPPING = {
+    "Mathématiques": [
+        "Mathématiques", "Physique", "SVT", "Informatique", 
+        "Philosophie", "Arabe", "Français", "Anglais", 
+        "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Sciences Expérimentales": [
+        "SVT", "Physique", "Mathématiques", "Informatique", 
+        "Philosophie", "Arabe", "Français", "Anglais", 
+        "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Sciences Économiques et Gestion": [
+        "Économie", "Gestion", "Mathématiques", "Informatique", 
+        "Histoire-Géographie", "Philosophie", "Arabe", "Français", 
+        "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Lettres": [
+        "Arabe", "Philosophie", "Histoire-Géographie", "Français", 
+        "Anglais", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹", "Dessin"
+    ]
+}
+
 # --- 2. STYLING ---
 st.markdown("""
     <style>
@@ -43,8 +66,7 @@ def show_login():
 
 def show_bac_selection():
     st.markdown("## Choisissez votre section Bac")
-    options = ["Mathématiques", "Sciences Expérimentales", "Lettres", "Sciences Économiques et Gestion"]
-    for opt in options:
+    for opt in BAC_MAPPING.keys():
         if st.button(opt, use_container_width=True):
             st.session_state.user_data["bac_type"] = opt
             st.session_state.step = "level_audit"
@@ -52,30 +74,29 @@ def show_bac_selection():
 
 def show_level_audit():
     st.markdown(f"## Niveau : {st.session_state.user_data['bac_type']}")
-    
-    # Get subjects for the specific bac to audit them
-    bac_mapping = {
-        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique"],
-        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique"],
-        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique"],
-        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français"]
-    }
+    st.write("Indiquez votre niveau pour **chaque** matière :")
     
     current_bac = st.session_state.user_data['bac_type']
-    subjects_to_audit = bac_mapping.get(current_bac, ["Mathématiques", "Français"])
+    subjects_to_audit = BAC_MAPPING.get(current_bac, [])
     
     levels = {}
     for sub in subjects_to_audit:
-        levels[sub] = st.select_slider(f"{sub}", options=["Faible", "Intermédiaire", "Excellent"], value="Intermédiaire")
+        levels[sub] = st.select_slider(
+            f"Niveau en **{sub}**", 
+            options=["Faible", "Intermédiaire", "Excellent"], 
+            value="Intermédiaire",
+            key=f"audit_{sub}"
+        )
+        st.markdown("---")
     
-    if st.button("Suivant", use_container_width=True):
+    if st.button("Confirmer mon profil", use_container_width=True):
         st.session_state.user_data["levels"] = levels
         st.session_state.step = "philosophy"
         st.rerun()
 
 def show_philosophy():
     st.markdown("## Votre style d'apprentissage")
-    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, placeholder="Ex: Sois patient, utilise des exemples concrets, donne moi des astuces...")
+    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150)
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
         st.session_state.step = "dashboard"
@@ -97,18 +118,9 @@ def show_subject_hub():
     if st.button("← Retour au Dashboard"):
         st.session_state.step = "dashboard"
         st.rerun()
-    
     st.markdown(f"## AI Professor: {st.session_state.user_data['bac_type']}")
-    st.write("Sélectionnez une matière pour commencer votre diagnostic.")
-
-    bac_mapping = {
-        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹", "Dessin"]
-    }
-
-    subs = bac_mapping.get(st.session_state.user_data['bac_type'], [])
+    
+    subs = BAC_MAPPING.get(st.session_state.user_data['bac_type'], [])
     cols = st.columns(3)
     for i, sub in enumerate(subs):
         with cols[i % 3]:
@@ -121,7 +133,7 @@ def show_subject_hub():
 def show_chat_diagnose():
     st.markdown(f"### 👨‍🏫 Tuteur de {st.session_state.selected_subject}")
     if not st.session_state.get("messages"):
-        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous aujourd'hui ?"
+        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
         st.session_state.messages = [{"role": "assistant", "content": intro}]
 
     for m in st.session_state.messages:
