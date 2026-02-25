@@ -34,12 +34,12 @@ st.markdown("""
     div[data-testid="InputInstructions"] { display: none; }
     
     /* Inline Validation Styles */
-    .validation-msg { font-size: 14px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
+    .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
     
-    /* Visual Feedback: Input States */
-    div[data-baseweb="input"] { border-radius: 8px; transition: 0.3s; border: 1px solid #ccc; }
+    /* Input State Polish */
+    div[data-baseweb="input"] { border-radius: 8px; transition: 0.3s; }
     
     hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
@@ -53,7 +53,6 @@ def is_valid_email(email):
 
 def show_landing():
     st.markdown("<h1 class='main-title'>KhirMinTaki</h1>", unsafe_allow_html=True)
-    # Welcome text removed
     if st.button("S'inscrire", use_container_width=True):
         st.session_state.step = "signup"
         st.rerun()
@@ -64,38 +63,36 @@ def show_landing():
 def show_signup():
     st.markdown("## Créer un compte")
     
-    # 1. Email Input & Feedback
+    # 1. Email Input
     email = st.text_input("Email")
     if email:
         if is_valid_email(email):
-            st.markdown("<p class='validation-msg success-text'>🟢 Success state: Email valide</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg success-text'>Email valide</p>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='validation-msg error-text'>🔴 Validation error message: Format invalide (name@example.com)</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg error-text'>Format invalide (name@example.com)</p>", unsafe_allow_html=True)
     
-    # 2. Password Input & Feedback
+    # 2. Password Input
     pwd = st.text_input("Mot de passe", type="password")
     if pwd:
         if len(pwd) >= 8:
-            st.markdown("<p class='validation-msg success-text'>🟢 Success state: Longueur valide</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg success-text'>Longueur valide</p>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='validation-msg error-text'>🔴 Validation error message: Minimum 8 caractères</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg error-text'>Minimum 8 caractères</p>", unsafe_allow_html=True)
             
-    # 3. Confirm Password & Feedback
+    # 3. Confirm Password
     pwd_conf = st.text_input("Confirmez votre mot de passe", type="password")
     if pwd_conf:
         if pwd == pwd_conf:
-            st.markdown("<p class='validation-msg success-text'>🟢 Success state: Les mots de passe correspondent</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg success-text'>Les mots de passe correspondent</p>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='validation-msg error-text'>🔴 Validation error message: Ne correspond pas</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg error-text'>Ne correspond pas</p>", unsafe_allow_html=True)
 
+    # Note: Error box removed here as requested
     if st.button("Créer mon compte", use_container_width=True):
         if is_valid_email(email) and len(pwd) >= 8 and pwd == pwd_conf:
             st.session_state.mock_db[email] = pwd
-            st.success("Form validation feedback: Compte créé !")
             st.session_state.step = "login"
             st.rerun()
-        else:
-            st.error("🔴 Error state: Veuillez corriger les erreurs ci-dessus.")
     
     if st.button("Retour", key="back_signup"):
         st.session_state.step = "landing"
@@ -112,13 +109,14 @@ def show_login():
             st.session_state.step = "bac_selection"
             st.rerun()
         else:
-            st.error("🔴 Error state: Email ou mot de passe incorrect.")
+            st.error("Email ou mot de passe incorrect.")
 
     if st.button("Retour", key="back_login"):
         st.session_state.step = "landing"
         st.rerun()
 
-# --- REUSING CURRICULUM LOGIC ---
+# --- LOGIC FOR CORE FEATURES ---
+
 CORE_MAPPING = {
     "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
     "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
@@ -134,9 +132,6 @@ def show_bac_selection():
             st.session_state.step = "option_selection"
             st.rerun()
 
-# --- (Other functions: show_option_selection, show_level_audit, show_philosophy, show_dashboard, show_subject_hub, show_chat_diagnose) ---
-# ... [Keeping the same structure as previous versions for these functions] ...
-
 def show_option_selection():
     st.markdown("## ✨ Choisissez votre Option")
     options = {"Allemand": "🇩🇪", "Espagnol": "🇪🇸", "Italien": "🇮🇹", "Russe": "🇷🇺", "Chinois": "🇨🇳", "Dessin": "🎨"}
@@ -148,9 +143,9 @@ def show_option_selection():
 
 def get_full_subject_list():
     bac = st.session_state.user_data.get("bac_type")
-    option = st.session_state.user_data.get("selected_option")
+    opt = st.session_state.user_data.get("selected_option")
     subjects = CORE_MAPPING.get(bac, []).copy()
-    if option: subjects.append(option)
+    if opt: subjects.append(opt)
     return subjects
 
 def show_level_audit():
