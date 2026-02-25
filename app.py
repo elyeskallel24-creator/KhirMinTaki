@@ -20,6 +20,7 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 if "mock_db" not in st.session_state:
+    # Simulated database for testing
     st.session_state.mock_db = {"test@taki.com": "password123"}
 
 # --- 2. STYLING & UI/UX FEEDBACK ---
@@ -30,22 +31,17 @@ st.markdown("""
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
     
-    /* Remove "Press Enter to apply" */
     div[data-testid="InputInstructions"] { display: none; }
     
-    /* Inline Validation Styles */
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
     
-    /* Input State Polish */
     div[data-baseweb="input"] { border-radius: 8px; transition: 0.3s; }
-    
     hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
 
-# Helper for Email Validation
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
@@ -63,10 +59,14 @@ def show_landing():
 def show_signup():
     st.markdown("## Créer un compte")
     
-    # 1. Email Input
+    # 1. Email Input with Duplicate Check
     email = st.text_input("Email")
+    email_exists = email in st.session_state.mock_db
+    
     if email:
-        if is_valid_email(email):
+        if email_exists:
+            st.markdown("<p class='validation-msg error-text'>Cet email est déjà utilisé</p>", unsafe_allow_html=True)
+        elif is_valid_email(email):
             st.markdown("<p class='validation-msg success-text'>Email valide</p>", unsafe_allow_html=True)
         else:
             st.markdown("<p class='validation-msg error-text'>Format invalide (name@example.com)</p>", unsafe_allow_html=True)
@@ -87,9 +87,8 @@ def show_signup():
         else:
             st.markdown("<p class='validation-msg error-text'>Ne correspond pas</p>", unsafe_allow_html=True)
 
-    # Note: Error box removed here as requested
     if st.button("Créer mon compte", use_container_width=True):
-        if is_valid_email(email) and len(pwd) >= 8 and pwd == pwd_conf:
+        if is_valid_email(email) and not email_exists and len(pwd) >= 8 and pwd == pwd_conf:
             st.session_state.mock_db[email] = pwd
             st.session_state.step = "login"
             st.rerun()
