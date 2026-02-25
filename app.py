@@ -19,10 +19,10 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 if "mock_db" not in st.session_state:
+    # Adding a default user for testing: test@taki.com / password123
     st.session_state.mock_db = {"test@taki.com": "password123"}
 
-# --- 2. DYNAMIC CSS FOR VALIDATION ---
-# This CSS removes the focus glow and sets borders based on your rules
+# --- 2. DYNAMIC CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -30,24 +30,15 @@ st.markdown("""
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
     
-    /* Remove "Press Enter to apply" */
     div[data-testid="InputInstructions"] { display: none; }
     
-    /* Remove default focus state and glow */
-    div[data-baseweb="input"] { 
-        border: 1px solid #ccc !important; 
-        box-shadow: none !important; 
-    }
-    div[data-baseweb="input"]:focus-within { 
-        border: 1px solid #ccc !important; 
-        box-shadow: none !important; 
-    }
+    /* Remove focus glow */
+    div[data-baseweb="input"] { border: 1px solid #ccc !important; box-shadow: none !important; }
+    div[data-baseweb="input"]:focus-within { border: 1px solid #ccc !important; box-shadow: none !important; }
 
-    /* Inline Validation Text */
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
-    
     hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
@@ -68,8 +59,6 @@ def show_landing():
 
 def show_signup():
     st.markdown("## Créer un compte")
-    
-    # 1. Email Logic
     email = st.text_input("Email", key="signup_email")
     email_valid = is_valid_email(email) if email else None
     email_exists = email in st.session_state.mock_db
@@ -82,10 +71,9 @@ def show_signup():
             st.markdown("<p class='validation-msg success-text'>Email valide</p>", unsafe_allow_html=True)
             st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='validation-msg error-text'>Format invalide (name@example.com)</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg error-text'>Format invalide</p>", unsafe_allow_html=True)
             st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
     
-    # 2. Password Logic
     pwd = st.text_input("Mot de passe", type="password", key="signup_pwd")
     pwd_valid = len(pwd) >= 8 if pwd else None
     if pwd:
@@ -96,7 +84,6 @@ def show_signup():
             st.markdown("<p class='validation-msg error-text'>Minimum 8 caractères</p>", unsafe_allow_html=True)
             st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Mot de passe']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
-    # 3. Confirm Password Logic
     pwd_conf = st.text_input("Confirmez votre mot de passe", type="password", key="signup_pwd_conf")
     match_valid = (pwd == pwd_conf) if pwd_conf else None
     if pwd_conf:
@@ -119,24 +106,29 @@ def show_signup():
 
 def show_login():
     st.markdown("<h1 class='main-title'>Connexion</h1>", unsafe_allow_html=True)
-    email = st.text_input("Email")
-    password = st.text_input("Mot de passe", type="password")
     
+    email_log = st.text_input("Email", key="login_email")
+    pwd_log = st.text_input("Mot de passe", type="password", key="login_pwd")
+    
+    # Validation Logic for Login
+    account_exists = email_log in st.session_state.mock_db
+    correct_pwd = st.session_state.mock_db.get(email_log) == pwd_log if email_log else False
+
     if st.button("Se connecter", use_container_width=True):
-        if email in st.session_state.mock_db and st.session_state.mock_db[email] == password:
-            st.session_state.user_data["email"] = email
+        if account_exists and correct_pwd:
+            st.session_state.user_data["email"] = email_log
             st.session_state.step = "bac_selection"
             st.rerun()
         else:
-            st.error("Email ou mot de passe incorrect.")
+            # Inline error styling if login fails
+            st.markdown("<p class='validation-msg error-text'>Email ou mot de passe incorrect</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
     if st.button("Retour", key="back_login"):
         st.session_state.step = "landing"
         st.rerun()
 
-# --- THE REST OF YOUR FUNCTIONS (show_bac_selection, etc.) ---
-# ... [Keep your existing show_bac_selection, show_option_selection, get_full_subject_list, show_level_audit, show_philosophy, show_dashboard, show_subject_hub, show_chat_diagnose] ...
-
+# --- REMAINING APP LOGIC (Bac, Options, Audit, Dashboard, Chat) ---
 CORE_MAPPING = {
     "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
     "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
