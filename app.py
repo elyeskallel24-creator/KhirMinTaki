@@ -124,12 +124,24 @@ def show_subject_hub():
     if st.button("← Dashboard"):
         st.session_state.step = "dashboard"
         st.rerun()
-    st.markdown(f"## AI Professor: {st.session_state.user_data['bac_type']}")
+    st.markdown(f"## 👨‍🏫 AI Professor: {st.session_state.user_data['bac_type']}")
+    st.write("Sélectionnez une matière pour commencer votre diagnostic.")
+    
+    subject_emojis = {
+        "Mathématiques": "📐", "Physique": "⚛️", "SVT": "🧬", 
+        "Informatique": "💻", "Philosophie": "📜", "Arabe": "🇹🇳", 
+        "Français": "🇫🇷", "Anglais": "🇬🇧", "Économie": "📈", 
+        "Gestion": "💼", "Histoire-Géographie": "🌍", "Dessin": "🎨",
+        "Allemand 🇩🇪": "", "Espagnol 🇪🇸": "", "Italien 🇮🇹": ""
+    }
+
     subs = BAC_MAPPING.get(st.session_state.user_data['bac_type'], [])
     cols = st.columns(3)
     for i, sub in enumerate(subs):
+        emoji = subject_emojis.get(sub, "📘")
+        button_label = f"{emoji} {sub}".strip()
         with cols[i % 3]:
-            if st.button(f"📘 {sub}", key=f"sub_{sub}", use_container_width=True):
+            if st.button(button_label, key=f"sub_{sub}", use_container_width=True):
                 st.session_state.selected_subject = sub
                 st.session_state.step = "chat_diagnose"
                 st.session_state.messages = []
@@ -144,7 +156,7 @@ def show_chat_diagnose():
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
 
     if not st.session_state.get("messages"):
-        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
+        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous aujourd'hui ?"
         st.session_state.messages = [{"role": "assistant", "content": intro}]
 
     for m in st.session_state.messages:
@@ -158,12 +170,12 @@ def show_chat_diagnose():
                 st.session_state.current_chapter = prompt
                 st.session_state.diag_step = "questioning"
                 st.session_state.q_count = 1
-                response = f"D'accord, le chapitre **{prompt}**. Commençons par 10 questions pour évaluer tes acquis. \n\n **Question 1:** ..."
+                response = f"D'accord, le chapitre **{prompt}**. C'est parti pour 10 questions diagnostiques. \n\n **Question 1:** ..."
             elif st.session_state.q_count < 10:
                 st.session_state.q_count += 1
-                response = f"Bien reçu. **Question {st.session_state.q_count}:** [L'IA prépare la question...]"
+                response = f"Bien reçu. **Question {st.session_state.q_count}:** [Analyse en cours...]"
             else:
-                response = "Diagnostic terminé ! Ton plan personnalisé est maintenant disponible dans 'Plans'."
+                response = "Diagnostic terminé ! Ton plan personnalisé est prêt dans la section 'Plans'."
                 st.session_state.user_data["plan_ready"] = True
                 st.session_state.diag_step = "finished"
             
