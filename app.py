@@ -19,8 +19,10 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 if "mock_db" not in st.session_state:
-    # Adding a default user for testing: test@taki.com / password123
-    st.session_state.mock_db = {"test@taki.com": "password123"}
+    # Structure: { email: {"pwd": password, "profile_complete": bool, "data": {}} }
+    st.session_state.mock_db = {
+        "test@taki.com": {"pwd": "password123", "profile_complete": True, "data": {"bac_type": "Mathématiques"}}
+    }
 
 # --- 2. DYNAMIC CSS ---
 st.markdown("""
@@ -29,13 +31,9 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
-    
     div[data-testid="InputInstructions"] { display: none; }
-    
-    /* Remove focus glow */
     div[data-baseweb="input"] { border: 1px solid #ccc !important; box-shadow: none !important; }
     div[data-baseweb="input"]:focus-within { border: 1px solid #ccc !important; box-shadow: none !important; }
-
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
@@ -96,7 +94,7 @@ def show_signup():
 
     if st.button("Créer mon compte", use_container_width=True):
         if email_valid and not email_exists and pwd_valid and match_valid:
-            st.session_state.mock_db[email] = pwd
+            st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {}}
             st.session_state.step = "login"
             st.rerun()
     
@@ -106,21 +104,22 @@ def show_signup():
 
 def show_login():
     st.markdown("<h1 class='main-title'>Connexion</h1>", unsafe_allow_html=True)
-    
     email_log = st.text_input("Email", key="login_email")
     pwd_log = st.text_input("Mot de passe", type="password", key="login_pwd")
     
-    # Validation Logic for Login
-    account_exists = email_log in st.session_state.mock_db
-    correct_pwd = st.session_state.mock_db.get(email_log) == pwd_log if email_log else False
-
     if st.button("Se connecter", use_container_width=True):
-        if account_exists and correct_pwd:
+        user_entry = st.session_state.mock_db.get(email_log)
+        if user_entry and user_entry["pwd"] == pwd_log:
+            st.session_state.user_data = user_entry["data"]
             st.session_state.user_data["email"] = email_log
-            st.session_state.step = "bac_selection"
+            
+            # ROUTING LOGIC: New user vs Existing user
+            if user_entry["profile_complete"]:
+                st.session_state.step = "dashboard"
+            else:
+                st.session_state.step = "bac_selection"
             st.rerun()
         else:
-            # Inline error styling if login fails
             st.markdown("<p class='validation-msg error-text'>Email ou mot de passe incorrect</p>", unsafe_allow_html=True)
             st.markdown("<style>div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
@@ -128,7 +127,8 @@ def show_login():
         st.session_state.step = "landing"
         st.rerun()
 
-# --- REMAINING APP LOGIC (Bac, Options, Audit, Dashboard, Chat) ---
+# --- PROFILE SETUP FLOW ---
+
 CORE_MAPPING = {
     "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
     "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
@@ -178,8 +178,16 @@ def show_philosophy():
     style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150)
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
+        
+        # SAVE TO DB AND MARK COMPLETE
+        email = st.session_state.user_data["email"]
+        st.session_state.mock_db[email]["profile_complete"] = True
+        st.session_state.mock_db[email]["data"] = st.session_state.user_data
+        
         st.session_state.step = "dashboard"
         st.rerun()
+
+# --- MAIN APP ---
 
 def show_dashboard():
     st.markdown(f"## Bienvenue, {st.session_state.user_data['email'].split('@')[0]}")
@@ -195,6 +203,9 @@ def show_dashboard():
         if st.button("📅 Plans" if plan_ready else "📅 Plans (🔒)", disabled=not plan_ready, use_container_width=True):
             st.session_state.step = "view_plan"
             st.rerun()
+    if st.button("Déconnexion"):
+        st.session_state.step = "landing"
+        st.rerun()
 
 def show_subject_hub():
     if st.button("← Dashboard"):
