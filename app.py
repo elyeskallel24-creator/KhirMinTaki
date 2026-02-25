@@ -19,7 +19,6 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 if "mock_db" not in st.session_state:
-    # Structure: { email: {"pwd": password, "profile_complete": bool, "data": {}} }
     st.session_state.mock_db = {
         "test@taki.com": {"pwd": "password123", "profile_complete": True, "data": {"bac_type": "Mathématiques"}}
     }
@@ -112,8 +111,6 @@ def show_login():
         if user_entry and user_entry["pwd"] == pwd_log:
             st.session_state.user_data = user_entry["data"]
             st.session_state.user_data["email"] = email_log
-            
-            # ROUTING LOGIC: New user vs Existing user
             if user_entry["profile_complete"]:
                 st.session_state.step = "dashboard"
             else:
@@ -178,12 +175,9 @@ def show_philosophy():
     style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150)
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
-        
-        # SAVE TO DB AND MARK COMPLETE
         email = st.session_state.user_data["email"]
         st.session_state.mock_db[email]["profile_complete"] = True
         st.session_state.mock_db[email]["data"] = st.session_state.user_data
-        
         st.session_state.step = "dashboard"
         st.rerun()
 
@@ -227,14 +221,23 @@ def show_subject_hub():
                 st.rerun()
 
 def show_chat_diagnose():
+    # New Go Back Button inside Chat
+    if st.button("← Quitter le chat"):
+        st.session_state.step = "subject_hub"
+        st.rerun()
+
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
+    
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
+    
     if not st.session_state.get("messages"):
         intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
         st.session_state.messages = [{"role": "assistant", "content": intro}]
+    
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.markdown(m["content"])
+    
     if prompt := st.chat_input("Réponds ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("assistant"):
