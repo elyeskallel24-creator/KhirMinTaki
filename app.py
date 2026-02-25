@@ -21,10 +21,25 @@ if "user_data" not in st.session_state:
 
 # CURRICULUM DATA
 BAC_MAPPING = {
-    "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-    "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-    "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"],
-    "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹", "Dessin"]
+    "Mathématiques": [
+        "Mathématiques", "Physique", "SVT", "Informatique", 
+        "Philosophie", "Arabe", "Français", "Anglais", 
+        "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Sciences Expérimentales": [
+        "SVT", "Physique", "Mathématiques", "Informatique", 
+        "Philosophie", "Arabe", "Français", "Anglais", 
+        "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Sciences Économiques et Gestion": [
+        "Économie", "Gestion", "Mathématiques", "Informatique", 
+        "Histoire-Géographie", "Philosophie", "Arabe", "Français", 
+        "Anglais", "Dessin", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹"
+    ],
+    "Lettres": [
+        "Arabe", "Philosophie", "Histoire-Géographie", "Français", 
+        "Anglais", "Allemand 🇩🇪", "Espagnol 🇪🇸", "Italien 🇮🇹", "Dessin"
+    ]
 }
 
 # --- 2. STYLING ---
@@ -34,7 +49,7 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
-    hr { margin: 10px 0px; }
+    hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,12 +76,22 @@ def show_bac_selection():
 def show_level_audit():
     st.markdown(f"## 📊 Niveau : {st.session_state.user_data['bac_type']}")
     st.write("Indiquez votre niveau pour **chaque** matière :")
+    
     current_bac = st.session_state.user_data['bac_type']
     subjects_to_audit = BAC_MAPPING.get(current_bac, [])
+    
+    assessment_levels = ["Insuffisant", "Fragile", "Satisfaisant", "Bien", "Très bien", "Excellent"]
+    
     levels = {}
     for sub in subjects_to_audit:
-        levels[sub] = st.select_slider(f"**{sub}**", options=["Faible", "Intermédiaire", "Excellent"], value="Intermédiaire", key=f"aud_{sub}")
+        levels[sub] = st.select_slider(
+            f"**{sub}**", 
+            options=assessment_levels, 
+            value="Satisfaisant", 
+            key=f"aud_{sub}"
+        )
         st.markdown("<hr>", unsafe_allow_html=True)
+        
     if st.button("Confirmer mon profil", use_container_width=True):
         st.session_state.user_data["levels"] = levels
         st.session_state.step = "philosophy"
@@ -74,7 +99,7 @@ def show_level_audit():
 
 def show_philosophy():
     st.markdown("## 🧠 Style d'apprentissage")
-    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, placeholder="Ex: Patient, utilise des schémas, explique comme si j'avais 5 ans...")
+    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, placeholder="Ex: Patient, explique les détails, donne beaucoup d'exercices...")
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
         st.session_state.step = "dashboard"
@@ -90,7 +115,6 @@ def show_dashboard():
         st.button("📄 Résumés (🔒)", disabled=True, use_container_width=True)
     with col2:
         st.button("📝 Exercices (🔒)", disabled=True, use_container_width=True)
-        # Plan is locked until diagnostic is done
         plan_label = "📅 Plans" if st.session_state.user_data.get("plan_ready") else "📅 Plans (🔒)"
         if st.button(plan_label, disabled=not st.session_state.user_data.get("plan_ready"), use_container_width=True):
             st.session_state.step = "view_plan"
@@ -116,9 +140,8 @@ def show_subject_hub():
 def show_chat_diagnose():
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
     
-    # Progress indicator
     if st.session_state.get("diag_step") == "questioning":
-        st.progress(st.session_state.q_count / 10, text=f"Progression : {st.session_state.q_count}/10")
+        st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
 
     if not st.session_state.get("messages"):
         intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
@@ -135,12 +158,12 @@ def show_chat_diagnose():
                 st.session_state.current_chapter = prompt
                 st.session_state.diag_step = "questioning"
                 st.session_state.q_count = 1
-                response = f"D'accord, le chapitre **{prompt}**. C'est parti pour 10 questions diagnostiques. \n\n **Question 1:** ..."
+                response = f"D'accord, le chapitre **{prompt}**. Commençons par 10 questions pour évaluer tes acquis. \n\n **Question 1:** ..."
             elif st.session_state.q_count < 10:
                 st.session_state.q_count += 1
-                response = f"C'est noté. **Question {st.session_state.q_count}:** [L'IA analyse vos réponses...]"
+                response = f"Bien reçu. **Question {st.session_state.q_count}:** [L'IA prépare la question...]"
             else:
-                response = "Bravo ! Diagnostic terminé. Je viens de générer ton plan d'étude personnalisé dans le menu 'Plans'."
+                response = "Diagnostic terminé ! Ton plan personnalisé est maintenant disponible dans 'Plans'."
                 st.session_state.user_data["plan_ready"] = True
                 st.session_state.diag_step = "finished"
             
