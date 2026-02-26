@@ -19,19 +19,21 @@ if "step" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 if "mock_db" not in st.session_state:
-    # Adding 'is_premium' to the default test user
     st.session_state.mock_db = {
-        "test@taki.com": {"pwd": "password123", "profile_complete": True, "data": {"bac_type": "Mathématiques", "is_premium": False}}
+        "test@taki.com": {"pwd": "password123", "profile_complete": True, "data": {"bac_type": "Mathématiques"}}
     }
 
-# --- 2. DYNAMIC CSS (STRICTLY YOURS) ---
+# --- 2. DYNAMIC CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
+    
     div[data-testid="InputInstructions"] { display: none; }
+    
+    /* Remove focus glow and color change for ALL inputs and text areas */
     div[data-baseweb="input"], div[data-baseweb="textarea"] { 
         border: 1px solid #ccc !important; 
         box-shadow: none !important; 
@@ -40,15 +42,23 @@ st.markdown("""
         border: 1px solid #ccc !important; 
         box-shadow: none !important; 
     }
+
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
+    
+    /* Subscription Card Styling */
     .sub-card {
-        background-color: #f8f9fa; padding: 30px; border-radius: 15px;
-        border: 1px solid #eee; text-align: center; margin-bottom: 25px;
+        background-color: #f8f9fa;
+        padding: 30px;
+        border-radius: 15px;
+        border: 1px solid #eee;
+        text-align: center;
+        margin-bottom: 25px;
     }
     .sub-title { color: #10a37f; font-weight: 800; font-size: 24px; margin-bottom: 10px; }
     .sub-desc { color: #555; line-height: 1.6; font-size: 16px; }
+    
     hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
@@ -76,15 +86,37 @@ def show_signup():
     if email:
         if email_exists:
             st.markdown("<p class='validation-msg error-text'>Cet email est déjà utilisé</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
         elif email_valid:
             st.markdown("<p class='validation-msg success-text'>Email valide</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p class='validation-msg error-text'>Format invalide</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
     
     pwd = st.text_input("Mot de passe", type="password", key="signup_pwd")
+    pwd_valid = len(pwd) >= 8 if pwd else None
+    if pwd:
+        if pwd_valid:
+            st.markdown("<p class='validation-msg success-text'>Longueur valide</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Mot de passe']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p class='validation-msg error-text'>Minimum 8 caractères</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Mot de passe']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
+
     pwd_conf = st.text_input("Confirmez votre mot de passe", type="password", key="signup_pwd_conf")
+    match_valid = (pwd == pwd_conf) if pwd_conf else None
+    if pwd_conf:
+        if match_valid:
+            st.markdown("<p class='validation-msg success-text'>Les mots de passe correspondent</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Confirmez votre mot de passe']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p class='validation-msg error-text'>Ne correspond pas</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Confirmez votre mot de passe']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
     if st.button("Créer mon compte", use_container_width=True):
-        if email_valid and not email_exists and len(pwd) >= 8 and pwd == pwd_conf:
-            st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {"is_premium": False}}
+        if email_valid and not email_exists and pwd_valid and match_valid:
+            st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {}}
             st.session_state.step = "login"
             st.rerun()
     
@@ -102,16 +134,20 @@ def show_login():
         if user_entry and user_entry["pwd"] == pwd_log:
             st.session_state.user_data = user_entry["data"]
             st.session_state.user_data["email"] = email_log
-            st.session_state.step = "dashboard" if user_entry["profile_complete"] else "bac_selection"
+            if user_entry["profile_complete"]:
+                st.session_state.step = "dashboard"
+            else:
+                st.session_state.step = "bac_selection"
             st.rerun()
         else:
-            st.error("Email ou mot de passe incorrect")
+            st.markdown("<p class='validation-msg error-text'>Email ou mot de passe incorrect</p>", unsafe_allow_html=True)
+            st.markdown("<style>div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
     if st.button("Retour", key="back_login"):
         st.session_state.step = "landing"
         st.rerun()
 
-# --- PROFILE FLOW (STRICTLY YOURS) ---
+# --- PROFILE SETUP FLOW ---
 CORE_MAPPING = {
     "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
     "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
@@ -158,6 +194,7 @@ def show_level_audit():
 
 def show_philosophy():
     st.markdown("## 🧠 Style d'apprentissage")
+    # Added unique key for the text area
     style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, key="style_input")
     if st.button("Enregistrer mon profil", use_container_width=True):
         st.session_state.user_data["style"] = style
@@ -167,7 +204,7 @@ def show_philosophy():
         st.session_state.step = "dashboard"
         st.rerun()
 
-# --- DASHBOARD ---
+# --- MAIN DASHBOARD & FEATURES ---
 
 def show_dashboard():
     st.markdown(f"## Bienvenue, {st.session_state.user_data['email'].split('@')[0]}")
@@ -193,13 +230,20 @@ def show_dashboard():
 
 def show_subscription():
     st.markdown("## 💎 Améliorez votre expérience")
-    st.markdown('<div class="sub-card"><div class="sub-title">Plan Premium</div><div class="sub-desc">Accès Gemini 1.5 Pro, messages illimités, et mémoire longue.</div></div>', unsafe_allow_html=True)
+    st.markdown("""
+        <div class="sub-card">
+            <div class="sub-title">Plan Premium</div>
+            <div class="sub-desc">
+                Accès étendu à notre modèle d’IA principal (raisonnement plus avancé, meilleure qualité d’apprentissage), 
+                messages illimités, davantage de téléversements, mémoire plus longue.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     if st.button("Acheter", use_container_width=True):
-        st.session_state.user_data["is_premium"] = True
-        st.success("Passé en Premium !")
+        st.success("Redirection vers le paiement...")
         st.session_state.step = "dashboard"
         st.rerun()
-    if st.button("← Retour", use_container_width=True):
+    if st.button("← Retour au Dashboard", use_container_width=True):
         st.session_state.step = "dashboard"
         st.rerun()
 
@@ -219,95 +263,37 @@ def show_subject_hub():
                 st.session_state.step = "chat_diagnose"
                 st.session_state.messages = []
                 st.session_state.q_count = 0
-                st.session_state.msg_count = 0  # Message counter for Plan 1
                 st.session_state.diag_step = "get_chapter"
                 st.rerun()
-
-# --- THE SMART, PERSISTENT CHAT (OPTIMIZED WITH CODE 2 & PLAN 1) ---
 
 def show_chat_diagnose():
     if st.button("← Quitter le chat"):
         st.session_state.step = "subject_hub"
         st.rerun()
-
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
-    
-    # LOAD HISTORY FROM SUPABASE
-    if not st.session_state.get("messages"):
-        try:
-            res = supabase.table("chat_history").select("*").eq("email", st.session_state.user_data["email"]).eq("subject", st.session_state.selected_subject).order("created_at").execute()
-            if res.data:
-                st.session_state.messages = [{"role": r["role"], "content": r["content"]} for r in res.data]
-            else:
-                intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
-                st.session_state.messages = [{"role": "assistant", "content": intro}]
-        except:
-            st.session_state.messages = [{"role": "assistant", "content": "Prêt pour le cours !"}]
-
-    is_premium = st.session_state.user_data.get("is_premium", False)
-    # Plan 1: Logic to limit free users to 3 messages AFTER diagnostic
-    limit_reached = not is_premium and st.session_state.msg_count >= 3 and st.session_state.diag_step == "learning"
-
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
-    
+    if not st.session_state.get("messages"):
+        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
+        st.session_state.messages = [{"role": "assistant", "content": intro}]
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.markdown(m["content"])
-
-    if limit_reached:
-        st.warning("🔒 Limite gratuite atteinte (3 messages). Passez au Premium pour continuer l'apprentissage illimité !")
-        if st.button("⭐ Débloquer le Premium"):
-            st.session_state.step = "subscription"
-            st.rerun()
-    else:
-        if prompt := st.chat_input("Réponds ici..."):
-            # Increment count only during learning phase
-            if st.session_state.get("diag_step") == "learning":
-                st.session_state.msg_count += 1
-            
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            
-            with st.chat_message("assistant"):
-                with st.spinner("Analyse..."):
-                    try:
-                        # Plan 1: CONTEXT INJECTION (The Brain always knows the student)
-                        levels = st.session_state.user_data.get("levels", {})
-                        student_level = levels.get(st.session_state.selected_subject, "Moyen")
-                        style = st.session_state.user_data.get("style", "Pédagogique")
-                        
-                        system_prompt = f"""Tu es un expert tuteur tunisien pour le Bac {st.session_state.user_data.get('bac_type')}. 
-                        Ton élève a un niveau '{student_level}' en {st.session_state.selected_subject}.
-                        Style demandé: {style}. Réponds en mixant Français et Darija tunisienne."""
-                        
-                        # Plan 1: HYBRID AI BRAIN (Groq for Free / Gemini for Premium)
-                        if is_premium:
-                            model = genai.GenerativeModel('gemini-1.5-pro')
-                            response_text = model.generate_content(f"{system_prompt}\n\nQuestion élève: {prompt}").text
-                        else:
-                            res = groq_client.chat.completions.create(
-                                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
-                                model="llama3-8b-8192"
-                            )
-                            response_text = res.choices[0].message.content
-                        
-                        # PERSIST TO SUPABASE (Code 2 Integration)
-                        supabase.table("chat_history").insert({"email": st.session_state.user_data["email"], "subject": st.session_state.selected_subject, "role": "user", "content": prompt}).execute()
-                        supabase.table("chat_history").insert({"email": st.session_state.user_data["email"], "subject": st.session_state.selected_subject, "role": "assistant", "content": response_text}).execute()
-
-                        # Step Management (Diagnostic Logic)
-                        if st.session_state.diag_step == "get_chapter":
-                            st.session_state.diag_step = "questioning"
-                            st.session_state.q_count = 1
-                        elif st.session_state.diag_step == "questioning":
-                            st.session_state.q_count += 1
-                            if st.session_state.q_count >= 10:
-                                st.session_state.diag_step = "learning"
-                                st.session_state.user_data["plan_ready"] = True
-
-                        st.markdown(response_text)
-                        st.session_state.messages.append({"role": "assistant", "content": response_text})
-                    except Exception as e:
-                        st.error(f"Erreur API: {e}")
+    if prompt := st.chat_input("Réponds ici..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("assistant"):
+            if st.session_state.diag_step == "get_chapter":
+                st.session_state.current_chapter = prompt
+                st.session_state.diag_step = "questioning"
+                st.session_state.q_count = 1
+                response = f"D'accord, le chapitre **{prompt}**. Question 1: ..."
+            elif st.session_state.q_count < 10:
+                st.session_state.q_count += 1
+                response = f"Question {st.session_state.q_count}: [Analyse...]"
+            else:
+                response = "Diagnostic terminé !"
+                st.session_state.user_data["plan_ready"] = True
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
 # --- ROUTER ---
