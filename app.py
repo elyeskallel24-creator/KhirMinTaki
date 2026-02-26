@@ -78,7 +78,6 @@ def show_landing():
         st.rerun()
 
 def show_signup():
-    def show_signup():
     st.markdown("## Créer un compte")
     email = st.text_input("Email", key="signup_email")
     email_valid = is_valid_email(email) if email else None
