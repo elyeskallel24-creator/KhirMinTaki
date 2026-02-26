@@ -31,23 +31,33 @@ st.markdown("""
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
     
-    /* Remove default focus glows and red outlines */
     div[data-testid="InputInstructions"] { display: none; }
     
-    /* Force neutral borders on all inputs and textareas even when focused */
+    /* Remove focus glow and color change for ALL inputs and text areas */
     div[data-baseweb="input"], div[data-baseweb="textarea"] { 
         border: 1px solid #ccc !important; 
         box-shadow: none !important; 
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within { 
-        border: 1px solid #10a37f !important; 
+        border: 1px solid #ccc !important; 
         box-shadow: none !important; 
     }
 
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
-    .counter-text { font-size: 12px; color: #666; margin-top: 5px; text-align: right; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
+    
+    /* Subscription Card Styling */
+    .sub-card {
+        background-color: #f8f9fa;
+        padding: 30px;
+        border-radius: 15px;
+        border: 1px solid #eee;
+        text-align: center;
+        margin-bottom: 25px;
+    }
+    .sub-title { color: #10a37f; font-weight: 800; font-size: 24px; margin-bottom: 10px; }
+    .sub-desc { color: #555; line-height: 1.6; font-size: 16px; }
     
     hr { margin: 15px 0px; border: 0; border-top: 1px solid #eee; }
     </style>
@@ -138,15 +148,15 @@ def show_login():
         st.rerun()
 
 # --- PROFILE SETUP FLOW ---
+CORE_MAPPING = {
+    "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
+    "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
+    "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais"],
+    "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais"]
+}
 
 def show_bac_selection():
     st.markdown("## 🎓 Quelle est votre section Bac ?")
-    CORE_MAPPING = {
-        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais"]
-    }
     for opt in CORE_MAPPING.keys():
         if st.button(opt, use_container_width=True):
             st.session_state.user_data["bac_type"] = opt
@@ -163,12 +173,6 @@ def show_option_selection():
             st.rerun()
 
 def get_full_subject_list():
-    CORE_MAPPING = {
-        "Mathématiques": ["Mathématiques", "Physique", "SVT", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Sciences Expérimentales": ["SVT", "Physique", "Mathématiques", "Informatique", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Sciences Économiques et Gestion": ["Économie", "Gestion", "Mathématiques", "Informatique", "Histoire-Géographie", "Philosophie", "Arabe", "Français", "Anglais"],
-        "Lettres": ["Arabe", "Philosophie", "Histoire-Géographie", "Français", "Anglais"]
-    }
     bac = st.session_state.user_data.get("bac_type")
     opt = st.session_state.user_data.get("selected_option")
     subjects = CORE_MAPPING.get(bac, []).copy()
@@ -190,30 +194,17 @@ def show_level_audit():
 
 def show_philosophy():
     st.markdown("## 🧠 Style d'apprentissage")
-    st.info("Décrivez comment vous apprenez le mieux (ex: exemples concrets, résumés courts, ton rigoureux...)")
-    
-    style_text = st.text_area("Votre message :", height=150, key="style_input_field")
-    char_count = len(style_text)
-    
-    # Live Character Counter
-    color = "#28a745" if char_count >= 80 else "#666"
-    st.markdown(f"<p class='counter-text' style='color: {color};'>{char_count}/80 caractères</p>", unsafe_allow_html=True)
-    
-    # Requirement Logic
-    is_ready = char_count >= 80
-    
-    if not is_ready:
-        st.warning("Veuillez saisir au moins 80 caractères pour continuer.")
-
-    if st.button("Enregistrer mon profil", use_container_width=True, disabled=not is_ready):
-        st.session_state.user_data["style"] = style_text
+    # Added unique key for the text area
+    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, key="style_input")
+    if st.button("Enregistrer mon profil", use_container_width=True):
+        st.session_state.user_data["style"] = style
         email = st.session_state.user_data["email"]
         st.session_state.mock_db[email]["profile_complete"] = True
         st.session_state.mock_db[email]["data"] = st.session_state.user_data
         st.session_state.step = "dashboard"
         st.rerun()
 
-# --- MAIN APP ---
+# --- MAIN DASHBOARD & FEATURES ---
 
 def show_dashboard():
     st.markdown(f"## Bienvenue, {st.session_state.user_data['email'].split('@')[0]}")
@@ -229,12 +220,10 @@ def show_dashboard():
         if st.button("📅 Plans" if plan_ready else "📅 Plans (🔒)", disabled=not plan_ready, use_container_width=True):
             st.session_state.step = "view_plan"
             st.rerun()
-            
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("⭐ Abonnement", use_container_width=True):
         st.session_state.step = "subscription"
         st.rerun()
-        
     if st.button("Déconnexion"):
         st.session_state.step = "landing"
         st.rerun()
@@ -242,9 +231,9 @@ def show_dashboard():
 def show_subscription():
     st.markdown("## 💎 Améliorez votre expérience")
     st.markdown("""
-        <div class="sub-card" style="background-color: #f8f9fa; padding: 30px; border-radius: 15px; border: 1px solid #eee; text-align: center; margin-bottom: 25px;">
-            <div style="color: #10a37f; font-weight: 800; font-size: 24px; margin-bottom: 10px;">Plan Premium</div>
-            <div style="color: #555; line-height: 1.6; font-size: 16px;">
+        <div class="sub-card">
+            <div class="sub-title">Plan Premium</div>
+            <div class="sub-desc">
                 Accès étendu à notre modèle d’IA principal (raisonnement plus avancé, meilleure qualité d’apprentissage), 
                 messages illimités, davantage de téléversements, mémoire plus longue.
             </div>
