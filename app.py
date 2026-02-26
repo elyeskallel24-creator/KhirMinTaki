@@ -86,23 +86,35 @@ def show_signup():
     if email:
         if email_exists:
             st.markdown("<p class='validation-msg error-text'>Cet email est déjà utilisé</p>", unsafe_allow_html=True)
-            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
         elif email_valid:
             st.markdown("<p class='validation-msg success-text'>Email valide</p>", unsafe_allow_html=True)
-            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Email']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
-
+    
+    # --- PASSWORD LOGIC START ---
     pwd = st.text_input("Mot de passe", type="password", key="signup_pwd")
     
-    # --- PASSWORD VALIDATION LOGIC ---
-    pwd_valid = len(pwd) >= 8 if pwd else None
+    # Logic: Only show error if the user has started typing (len > 0) and it's less than 8
     if pwd:
-        if not pwd_valid:
-            st.markdown("<p class='validation-msg error-text'>Le mot de passe doit contenir au moins 8 caractères</p>", unsafe_allow_html=True)
-            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Mot de passe']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
+        if len(pwd) < 8:
+            st.markdown("<p class='validation-msg error-text'>Longueur invalide, minimum 8 caractères.</p>", unsafe_allow_html=True)
+            # Inject CSS to turn the border red for this specific input
+            st.markdown("""
+                <style>
+                div[data-testid="stTextInput"]:has(input[aria-label="Mot de passe"]) div[data-baseweb="input"] {
+                    border: 2px solid #dc3545 !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
         else:
             st.markdown("<p class='validation-msg success-text'>Longueur valide</p>", unsafe_allow_html=True)
-            st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Mot de passe']) div[data-baseweb='input'] { border: 2px solid #28a745 !important; }</style>", unsafe_allow_html=True)
-    # ---------------------------------
+            # Inject CSS to turn the border green when valid
+            st.markdown("""
+                <style>
+                div[data-testid="stTextInput"]:has(input[aria-label="Mot de passe"]) div[data-baseweb="input"] {
+                    border: 2px solid #28a745 !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+    # --- PASSWORD LOGIC END ---
 
     pwd_conf = st.text_input("Confirmez votre mot de passe", type="password", key="signup_pwd_conf")
     match_valid = (pwd == pwd_conf) if pwd_conf else None
@@ -111,10 +123,10 @@ def show_signup():
         if match_valid:
             st.markdown("<p class='validation-msg success-text'>Les mots de passe correspondent</p>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='validation-msg error-text'>Les mots de passe ne correspondent pas</p>", unsafe_allow_html=True)
+            st.markdown("<p class='validation-msg error-text'>Ne correspond pas</p>", unsafe_allow_html=True)
 
     if st.button("Créer mon compte", use_container_width=True):
-        if email_valid and not email_exists and pwd_valid and match_valid:
+        if email_valid and not email_exists and len(pwd) >= 8 and match_valid:
             st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {}}
             st.session_state.step = "login"
             st.rerun()
