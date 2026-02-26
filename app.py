@@ -1,5 +1,6 @@
 import streamlit as st
 import re
+import time
 import google.generativeai as genai
 from groq import Groq
 from supabase import create_client
@@ -30,9 +31,23 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     header, footer { visibility: hidden; }
     .main-title { text-align: center; font-weight: 800; font-size: 40px; margin-bottom: 20px; color: #10a37f; }
+    
     div[data-testid="InputInstructions"] { display: none; }
     div[data-baseweb="input"] { border: 1px solid #ccc !important; box-shadow: none !important; }
     div[data-baseweb="input"]:focus-within { border: 1px solid #ccc !important; box-shadow: none !important; }
+    
+    /* Premium Card Aesthetic */
+    .premium-card {
+        background: linear-gradient(135deg, #fff 0%, #f9f9f9 100%);
+        border: 2px solid #ffd700;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+        margin-bottom: 20px;
+    }
+    .premium-title { color: #b8860b; font-weight: 800; font-size: 24px; margin-bottom: 10px; }
+    .premium-text { color: #444; line-height: 1.6; font-size: 16px; }
+    
     .validation-msg { font-size: 13px; margin-top: -15px; margin-bottom: 10px; font-weight: 500; }
     .error-text { color: #dc3545; }
     .success-text { color: #28a745; }
@@ -185,6 +200,7 @@ def show_philosophy():
 
 def show_dashboard():
     st.markdown(f"## Bienvenue, {st.session_state.user_data['email'].split('@')[0]}")
+    
     col1, col2 = st.columns(2)
     with col1:
         if st.button("👨‍🏫 AI Professor", use_container_width=True):
@@ -197,8 +213,37 @@ def show_dashboard():
         if st.button("📅 Plans" if plan_ready else "📅 Plans (🔒)", disabled=not plan_ready, use_container_width=True):
             st.session_state.step = "view_plan"
             st.rerun()
+    
+    # Subscription Button
+    if st.button("⭐ Abonnement", use_container_width=True):
+        st.session_state.step = "subscription"
+        st.rerun()
+        
     if st.button("Déconnexion"):
         st.session_state.step = "landing"
+        st.rerun()
+
+def show_subscription():
+    if st.button("← Dashboard"):
+        st.session_state.step = "dashboard"
+        st.rerun()
+        
+    st.markdown("## 💎 Améliorez votre expérience")
+    
+    st.markdown("""
+        <div class='premium-card'>
+            <div class='premium-title'>Premium</div>
+            <div class='premium-text'>
+                Accès étendu à notre modèle d’IA principal (raisonnement plus avancé, meilleure qualité d’apprentissage), 
+                messages illimités, davantage de téléversements, mémoire plus longue.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("Acheter", use_container_width=True, type="primary"):
+        st.success("Redirection vers le paiement...")
+        time.sleep(2)
+        st.session_state.step = "dashboard"
         st.rerun()
 
 def show_subject_hub():
@@ -221,7 +266,6 @@ def show_subject_hub():
                 st.rerun()
 
 def show_chat_diagnose():
-    # New Go Back Button inside Chat
     if st.button("← Quitter le chat"):
         st.session_state.step = "subject_hub"
         st.rerun()
@@ -261,8 +305,8 @@ pages = {
     "landing": show_landing, "signup": show_signup, "login": show_login,
     "bac_selection": show_bac_selection, "option_selection": show_option_selection,
     "level_audit": show_level_audit, "philosophy": show_philosophy,
-    "dashboard": show_dashboard, "subject_hub": show_subject_hub,
-    "chat_diagnose": show_chat_diagnose
+    "dashboard": show_dashboard, "subscription": show_subscription,
+    "subject_hub": show_subject_hub, "chat_diagnose": show_chat_diagnose
 }
 
 if st.session_state.step in pages:
