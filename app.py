@@ -156,12 +156,21 @@ CORE_MAPPING = {
 
 def show_bac_selection():
     st.markdown("## 🎓 Quelle est votre section Bac ?")
+    
+    # Displaying the Tunisian Bac sections
     for opt in CORE_MAPPING.keys():
         if st.button(opt, use_container_width=True):
             st.session_state.user_data["bac_type"] = opt
-            st.session_state.step = "option_selection" # Continues the flow
+            st.session_state.step = "option_selection"
             st.rerun()
-
+    
+    # Visual separator for the back action
+    st.markdown("---")
+    
+    if st.button("← Retour au choix du système", key="back_to_curr"):
+        # This allows the user to switch back to the French Bac if needed
+        st.session_state.step = "curriculum_selection"
+        st.rerun()
 def show_curriculum_selection():
     st.markdown("## 🌍 Quel est votre système ?")
     
@@ -177,40 +186,71 @@ def show_curriculum_selection():
 
 def show_fr_level_selection():
     st.markdown("## 📚 Votre niveau (Bac Français)")
-    if st.button("Première", use_container_width=True):
-        st.session_state.user_data["fr_level"] = "Première"
-        st.session_state.step = "fr_voie_selection"
-        st.rerun()
-    if st.button("Terminale", use_container_width=True):
-        st.session_state.user_data["fr_level"] = "Terminale"
-        st.session_state.step = "fr_voie_selection"
-        st.rerun()
+    st.write("Sélectionnez votre classe actuelle pour adapter le programme.")
 
-def show_fr_voie_selection():
-    st.markdown(f"## 🛣️ Sélectionnez votre voie ({st.session_state.user_data['fr_level']})")
-    if st.button("Voie Générale", use_container_width=True):
-        st.session_state.user_data["fr_voie"] = "Générale"
-        st.session_state.step = "fr_specialites_selection"
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Première", use_container_width=True):
+            # Enregistre le niveau
+            st.session_state.user_data["fr_level"] = "Première"
+            # Direction le choix de la voie (Générale ou Techno)
+            st.session_state.step = "fr_voie_selection"
+            st.rerun()
+            
+    with col2:
+        if st.button("Terminale", use_container_width=True):
+            # Enregistre le niveau
+            st.session_state.user_data["fr_level"] = "Terminale"
+            # Direction le choix de la voie (Générale ou Techno)
+            st.session_state.step = "fr_voie_selection"
+            st.rerun()
+
+    st.markdown("---")
+    if st.button("← Retour au choix du curriculum"):
+        st.session_state.step = "curriculum_selection"
         st.rerun()
-    if st.button("Voie Technologique", use_container_width=True):
-        st.session_state.user_data["fr_voie"] = "Technologique"
-        st.session_state.step = "fr_serie_selection"
+def show_fr_voie_selection():
+    # Récupération du niveau (Première ou Terminale) pour l'affichage
+    level = st.session_state.user_data.get('fr_level', '')
+    st.markdown(f"## 🛣️ Sélectionnez votre voie ({level})")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Voie Générale", use_container_width=True):
+            st.session_state.user_data["fr_voie"] = "Générale"
+            # Les élèves en voie générale doivent choisir leurs spécialités
+            st.session_state.step = "fr_specialites_selection"
+            st.rerun()
+            
+    with col2:
+        if st.button("Voie Technologique", use_container_width=True):
+            st.session_state.user_data["fr_voie"] = "Technologique"
+            # C'est ici que l'on redirige vers le choix de la série (STMG, STI2D, etc.)
+            st.session_state.step = "fr_serie_selection"
+            st.rerun()
+
+    if st.button("← Retour"):
+        st.session_state.step = "fr_level_selection"
         st.rerun()
 
 def show_fr_serie_selection():
     st.markdown("## 🔬 Choisissez votre série")
+    
+    # On définit la liste des séries
     series = ["STMG", "STI2D", "STL", "ST2S", "STD2A", "STHR"]
     
+    # On crée un bouton pour chaque série de la liste
     for s in series:
         if st.button(s, use_container_width=True):
-            # 1. On enregistre la série choisie
+            # Enregistre exactement le nom de la série (ex: "ST2S")
             st.session_state.user_data["fr_serie"] = s
             
-            # 2. On change l'étape vers l'audit de niveau
-            # C'est ici que get_full_subject_list() utilisera la série pour générer les matières
+            # Redirige vers l'audit
             st.session_state.step = "level_audit"
             
-            # 3. On force le rafraîchissement de la page
+            # Relance pour appliquer les changements
             st.rerun()
 
 def show_fr_specialites_selection():
@@ -259,15 +299,6 @@ def show_option_selection():
             st.session_state.step = "level_audit"
             st.rerun()
 
-FR_CORE_SUBJECTS = [
-    "Français (1re)" if "Première" else "Philosophie", 
-    "Histoire-Géographie", 
-    "LVA (Anglais)", 
-    "LVB", 
-    "Enseignement Scientifique", 
-    "EPS"
-]
-
 def get_full_subject_list():
     curriculum = st.session_state.user_data.get("curriculum")
     
@@ -286,8 +317,56 @@ def get_full_subject_list():
         voie = st.session_state.user_data.get("fr_voie")
         serie = st.session_state.user_data.get("fr_serie")
 
-        # --- CAS : STL (Technologique) ---
-        if voie == "Technologique" and serie == "STL":
+        # --- CAS : STHR (Hôtellerie et Restauration) ---
+        if voie == "Technologique" and serie == "STHR":
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "Mathématiques",
+                "Langue Vivante A",
+                "Langue Vivante B",
+                "EPS (Sport)",
+                "Enseignement Moral et Civique (EMC)",
+                "Sciences et Technologies de l’Hôtellerie et de la Restauration (STHR)",
+                "Cuisine et Service / Travaux Pratiques",
+                "Gestion et Mercatique appliquée à l’Hôtellerie",
+                "Projet professionnel / atelier pratique"
+            ]
+
+        # --- CAS : STD2A (Design) ---
+        elif voie == "Technologique" and serie == "STD2A":
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "Mathématiques",
+                "Langue Vivante A",
+                "Langue Vivante B",
+                "EPS (Sport)",
+                "Enseignement Moral et Civique (EMC)",
+                "Création et Culture Design (CCD)",
+                "Arts Appliqués et Projet Artistique",
+                "Technologie et Méthodologie de Projet",
+                "Travaux pratiques / Atelier"
+            ]
+
+        # --- CAS : ST2S (Santé-Social) ---
+        elif voie == "Technologique" and serie == "ST2S":
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "Mathématiques",
+                "Langue Vivante A",
+                "Langue Vivante B",
+                "EPS (Sport)",
+                "Enseignement Moral et Civique (EMC)",
+                "Sciences et Techniques Sanitaires et Sociales",
+                "Biologie et Physiopathologie Humaines",
+                "Psychologie / Sociologie appliquée",
+                "Travaux pratiques / projets santé-social"
+            ]
+
+        # --- CAS : STL (Laboratoire) ---
+        elif voie == "Technologique" and serie == "STL":
             return [
                 "Français" if level == "Première" else "Philosophie",
                 "Histoire-Géographie",
@@ -297,10 +376,10 @@ def get_full_subject_list():
                 "EPS (Sport)",
                 "Enseignement Moral et Civique (EMC)",
                 "Sciences Physiques et Chimiques",
-                "Biotechnologies ou SPCL" # Sujet spécifique à la série
+                "Biotechnologies ou SPCL"
             ]
 
-        # --- CAS : STI2D (Technologique) ---
+        # --- CAS : STI2D (Industrie) ---
         elif voie == "Technologique" and serie == "STI2D":
             return [
                 "Français" if level == "Première" else "Philosophie",
@@ -316,7 +395,7 @@ def get_full_subject_list():
                 "Sciences Physiques et Mathématiques appliquées"
             ]
 
-        # --- CAS : STMG (Technologique) ---
+        # --- CAS : STMG (Gestion) ---
         elif voie == "Technologique" and serie == "STMG":
             return [
                 "Français" if level == "Première" else "Philosophie",
@@ -331,7 +410,7 @@ def get_full_subject_list():
                 "Enseignement Moral et Civique"
             ]
 
-        # --- CAS : VOIE GÉNÉRALE ---
+        # --- CAS : VOIE GÉNÉRALE (Spécialités) ---
         elif voie == "Générale":
             subjects = [
                 "Français" if level == "Première" else "Philosophie",
@@ -347,73 +426,121 @@ def get_full_subject_list():
             
     return []
 def show_level_audit():
-    # 1. Safely determine which level name to display
     user_info = st.session_state.user_data
     curr = user_info.get("curriculum", "Tunisien")
     
-    # Use bac_type for Tunisians, fr_level for French
+    # 1. Détermination dynamique du titre
     if curr == "Tunisien":
-        level_display = user_info.get("bac_type", "Non défini")
+        # Pour les Tunisiens, on affiche la section (ex: Mathématiques)
+        level_display = user_info.get("bac_type", "Baccalauréat")
     else:
-        level_display = f"{user_info.get('fr_level', '')} {user_info.get('fr_voie', '')}"
+        # Pour les Français :
+        # On récupère le niveau (1re/Term)
+        level = user_info.get('fr_level', '')
+        # On récupère la série (STMG, etc.) ou la voie (Générale) si la série n'existe pas
+        branch = user_info.get('fr_serie', user_info.get('fr_voie', ''))
+        level_display = f"{level} {branch}"
 
     st.markdown(f"## 📊 Niveau : {level_display}")
     
-    # 2. Get the subjects list (this uses your updated get_full_subject_list)
+    # 2. Récupération de la liste des matières
     subjects = get_full_subject_list()
     
     if not subjects:
-        st.warning("Aucune matière trouvée pour ce profil.")
-        if st.button("Retour au début"):
+        st.error("Erreur : Impossible de charger les matières. Veuillez recommencer la sélection.")
+        if st.button("Retour au menu"):
             st.session_state.step = "curriculum_selection"
             st.rerun()
         return
 
+    # 3. Affichage des Sliders d'évaluation
     assessment_levels = ["Insuffisant", "Fragile", "Satisfaisant", "Bien", "Très bien", "Excellent"]
     levels = {}
     
+    st.info("Évaluez honnêtement votre niveau actuel dans chaque matière pour que l'IA puisse s'adapter.")
+    
     for sub in subjects:
-        levels[sub] = st.select_slider(f"**{sub}**", options=assessment_levels, value="Satisfaisant", key=f"aud_{sub}")
-        st.markdown("<hr>", unsafe_allow_html=True)
+        levels[sub] = st.select_slider(
+            f"Votre niveau en **{sub}**",
+            options=assessment_levels,
+            value="Satisfaisant",
+            key=f"aud_{sub}"
+        )
+        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
         
+    # 4. Bouton de validation
     if st.button("Confirmer mon profil", use_container_width=True):
         st.session_state.user_data["levels"] = levels
         st.session_state.step = "philosophy"
         st.rerun()
 
 def show_philosophy():
-    st.markdown("## 🧠 Style d'apprentissage")
-    # Added unique key for the text area
-    style = st.text_area("Comment voulez-vous que votre tuteur vous enseigne ?", height=150, key="style_input")
-    if st.button("Enregistrer mon profil", use_container_width=True):
-        st.session_state.user_data["style"] = style
-        email = st.session_state.user_data["email"]
-        st.session_state.mock_db[email]["profile_complete"] = True
-        st.session_state.mock_db[email]["data"] = st.session_state.user_data
-        st.session_state.step = "dashboard"
-        st.rerun()
+    st.markdown("## 🧠 Votre philosophie d'apprentissage")
+    st.write("Comment souhaitez-vous que votre professeur IA interagisse avec vous ?")
+
+    # On définit les options
+    philosophies = {
+        "Socratique": "Pose des questions pour vous faire réfléchir.",
+        "Pragmatique": "Direct, axé sur les exercices et les résultats.",
+        "Bienveillant": "Encourageant, idéal pour reprendre confiance.",
+        "Rigoureux": "Précis, ne laisse passer aucune erreur."
+    }
+
+    # Affichage des choix
+    for name, desc in philosophies.items():
+        if st.button(f"{name} : {desc}", use_container_width=True):
+            # 1. On enregistre la philosophie choisie
+            st.session_state.user_data["philosophy"] = name
+            
+            # --- BLOC DE DÉBOGAGE (À garder le temps des tests) ---
+            st.success(f"Philosophie {name} enregistrée !")
+            st.write("Vérification finale de votre profil avant le Dashboard :")
+            st.json(st.session_state.user_data) # st.json est plus lisible que st.write
+            
+            import time
+            time.sleep(3) # On laisse 3 secondes pour vérifier les données
+            # -------------------------------------------------------
+
+            # 2. Passage au tableau de bord
+            st.session_state.step = "dashboard"
+            st.rerun()
 
 # --- MAIN DASHBOARD & FEATURES ---
 
 def show_dashboard():
-    st.markdown(f"## Bienvenue, {st.session_state.user_data['email'].split('@')[0]}")
+    # Safely get the email; if not found, default to "Étudiant"
+    user_email = st.session_state.user_data.get('email', 'Étudiant@taki.com')
+    
+    # Extract the name before the '@' symbol
+    display_name = user_email.split('@')[0]
+    
+    st.markdown(f"## Bienvenue, {display_name}")
+    
     col1, col2 = st.columns(2)
     with col1:
         if st.button("👨‍🏫 AI Professor", use_container_width=True):
             st.session_state.step = "subject_hub"
             st.rerun()
         st.button("📄 Résumés (🔒)", disabled=True, use_container_width=True)
+        
     with col2:
         st.button("📝 Exercices (🔒)", disabled=True, use_container_width=True)
         plan_ready = st.session_state.user_data.get("plan_ready")
-        if st.button("📅 Plans" if plan_ready else "📅 Plans (🔒)", disabled=not plan_ready, use_container_width=True):
+        if st.button("📅 Plans" if plan_ready else "📅 Plans (🔒)", 
+                     disabled=not plan_ready, 
+                     use_container_width=True):
             st.session_state.step = "view_plan"
             st.rerun()
+            
     st.markdown("<hr>", unsafe_allow_html=True)
+    
     if st.button("⭐ Abonnement", use_container_width=True):
         st.session_state.step = "subscription"
         st.rerun()
+        
     if st.button("Déconnexion"):
+        # Clear sensitive data and return to landing
+        st.session_state.user_data = {}
         st.session_state.step = "landing"
         st.rerun()
 
@@ -437,17 +564,59 @@ def show_subscription():
         st.rerun()
 
 def show_subject_hub():
+    # Bouton de retour au tableau de bord
     if st.button("← Dashboard"):
         st.session_state.step = "dashboard"
         st.rerun()
+        
     st.markdown(f"## 👨‍🏫 AI Professor")
+    
+    # Récupère dynamiquement la liste des matières selon le profil utilisateur
     subjects = get_full_subject_list()
-    subject_emojis = {"Mathématiques": "📐", "Physique": "⚛️", "SVT": "🧬", "Informatique": "💻", "Philosophie": "📜", "Arabe": "🇹🇳", "Français": "🇫🇷", "Anglais": "🇬🇧", "Économie": "📈", "Gestion": "💼", "Histoire-Géographie": "🌍", "Dessin": "🎨", "Allemand": "🇩🇪", "Espagnol": "🇪🇸", "Italien": "🇮🇹", "Russe": "🇷🇺", "Chinois": "🇨🇳"}
+    
+    # --- DICTIONNAIRE COMPLET DES EMOJIS ---
+    subject_emojis = {
+        # Tronc Commun & Tunisien
+        "Mathématiques": "📐", "Physique": "⚛️", "Physique-Chimie": "🧪", 
+        "SVT": "🧬", "Informatique": "💻", "Philosophie": "📜", 
+        "Arabe": "🇹🇳", "Français": "🇫🇷", "Anglais": "🇬🇧", 
+        "Économie": "📈", "Gestion": "💼", "Histoire-Géographie": "🌍", 
+        "LVA (Anglais)": "🇬🇧", "LVB": "🌍", "EPS": "🏃", "EPS (Sport)": "🏃",
+        "Enseignement Moral et Civique (EMC)": "🗳️", "Enseignement Scientifique": "🧬",
+
+        # Spécificités STHR (Hôtellerie-Restauration)
+        "Sciences et Technologies de l’Hôtellerie et de la Restauration (STHR)": "🏨",
+        "Cuisine et Service / Travaux Pratiques": "👨‍🍳",
+        "Gestion et Mercatique appliquée à l’Hôtellerie": "📊",
+        "Projet professionnel / atelier pratique": "💼",
+
+        # Autres Séries Technologiques (STI2D, STMG, ST2S, STD2A, STL)
+        "Management": "🏢", 
+        "Sciences de Gestion et Numérique": "📊", 
+        "Droit et Économie": "⚖️",
+        "Innovation Technologique": "🛠️", 
+        "Ingénierie et Développement Durable": "🌱",
+        "Sciences Physiques et Mathématiques appliquées": "🔬",
+        "Sciences et Techniques Sanitaires et Sociales": "🏥",
+        "Biologie et Physiopathologie Humaines": "🫀",
+        "Création et Culture Design (CCD)": "🎨",
+        "Arts Appliqués et Projet Artistique": "🖌️",
+        "Technologie et Méthodologie de Projet": "📐",
+        "Travaux pratiques / Atelier": "🏗️",
+        "Sciences Physiques et Chimiques": "🧪",
+        "Biotechnologies ou SPCL": "🧪"
+    }
+    
+    # Affichage en grille de 3 colonnes
     cols = st.columns(3)
     for i, sub in enumerate(subjects):
+        # Récupère l'émoji correspondant ou un livre bleu par défaut
         emoji = subject_emojis.get(sub, "📘")
+        
         with cols[i % 3]:
+            # Création du bouton pour chaque matière
             if st.button(f"{emoji} {sub}", key=f"sub_{sub}", use_container_width=True):
+                # Configuration de la session pour le diagnostic IA
                 st.session_state.selected_subject = sub
                 st.session_state.step = "chat_diagnose"
                 st.session_state.messages = []
@@ -487,6 +656,8 @@ def show_chat_diagnose():
 
 
 # --- ROUTER ---
+# This dictionary maps the step name to the corresponding function.
+# Ensure all these functions are defined above this block.
 pages = {
     "landing": show_landing, 
     "signup": show_signup, 
@@ -506,5 +677,18 @@ pages = {
     "chat_diagnose": show_chat_diagnose
 }
 
-if st.session_state.step in pages:
-    pages[st.session_state.step]()
+# 1. Get the current step safely (defaults to "landing" if not set)
+current_step = st.session_state.get("step", "landing")
+
+# 2. Check if the current step exists in our mapping
+if current_step in pages:
+    # 3. Call the function associated with the step
+    pages[current_step]()
+else:
+    # 4. Fallback UI if a step is misspelled or missing
+    st.error(f"⚠️ Erreur de navigation : L'étape '{current_step}' est introuvable.")
+    st.info("La session a peut-être expiré ou une redirection est mal configurée.")
+    
+    if st.button("Retour à l'accueil", use_container_width=True):
+        st.session_state.step = "landing"
+        st.rerun()
