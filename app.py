@@ -203,18 +203,19 @@ def show_fr_serie_selection():
     
     for s in series:
         if st.button(s, use_container_width=True):
-            # 1. Save the specific series selected (STI2D, STMG, etc.)
+            # 1. On enregistre la série choisie
             st.session_state.user_data["fr_serie"] = s
             
-            # 2. Redirect to the Level Audit page
-            # This triggers get_full_subject_list() to load the specific subjects you defined
+            # 2. On change l'étape vers l'audit de niveau
+            # C'est ici que get_full_subject_list() utilisera la série pour générer les matières
             st.session_state.step = "level_audit"
             
-            # 3. Force the app to refresh and show the new page
+            # 3. On force le rafraîchissement de la page
             st.rerun()
 
 def show_fr_specialites_selection():
     level = st.session_state.user_data.get("fr_level")
+    # Définit la limite selon le niveau choisi précédemment
     limit = 3 if level == "Première" else 2
     
     st.markdown(f"## 🧪 Les spécialités ({level})")
@@ -226,19 +227,28 @@ def show_fr_specialites_selection():
         "Humanités, Littérature et Philosophie", "Langues étrangères approfondies"
     ]
     
-    # Use checkboxes for multiple selection
+    # Création des cases à cocher
     selected = []
     for spec in specs:
         if st.checkbox(spec, key=f"check_{spec}"):
             selected.append(spec)
     
+    st.markdown("---") # Séparateur visuel
+
+    # --- LE BLOC DE REDIRECTION ---
     if st.button("Confirmer mes spécialités", use_container_width=True):
         if len(selected) == limit:
+            # Enregistre les choix dans les données utilisateur
             st.session_state.user_data["fr_specialites"] = selected
+            
+            # Change l'étape du routeur pour afficher l'audit des matières
             st.session_state.step = "level_audit"
+            
+            # Relance l'application pour afficher la nouvelle page
             st.rerun()
         else:
-            st.error(f"Vous devez sélectionner exactement {limit} spécialités (actuellement : {len(selected)}).")
+            # Message d'erreur si le compte n'est pas bon
+            st.error(f"Attention : vous devez sélectionner exactement {limit} spécialités (actuellement : {len(selected)}).")
 
 def show_option_selection():
     st.markdown("## ✨ Choisissez votre Option")
@@ -261,7 +271,7 @@ FR_CORE_SUBJECTS = [
 def get_full_subject_list():
     curriculum = st.session_state.user_data.get("curriculum")
     
-    # 1. TUNISIAN FLOW
+    # 1. FLUX TUNISIEN
     if curriculum == "Tunisien":
         bac = st.session_state.user_data.get("bac_type")
         subjects = CORE_MAPPING.get(bac, []).copy()
@@ -270,14 +280,28 @@ def get_full_subject_list():
             subjects.append(opt)
         return subjects
 
-    # 2. FRENCH FLOW
+    # 2. FLUX FRANÇAIS
     elif curriculum == "Français":
         level = st.session_state.user_data.get("fr_level")
         voie = st.session_state.user_data.get("fr_voie")
         serie = st.session_state.user_data.get("fr_serie")
 
-        # CASE A: STI2D (Technologique)
-        if voie == "Technologique" and serie == "STI2D":
+        # --- CAS : STL (Technologique) ---
+        if voie == "Technologique" and serie == "STL":
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "Mathématiques",
+                "Langue Vivante A",
+                "Langue Vivante B",
+                "EPS (Sport)",
+                "Enseignement Moral et Civique (EMC)",
+                "Sciences Physiques et Chimiques",
+                "Biotechnologies ou SPCL" # Sujet spécifique à la série
+            ]
+
+        # --- CAS : STI2D (Technologique) ---
+        elif voie == "Technologique" and serie == "STI2D":
             return [
                 "Français" if level == "Première" else "Philosophie",
                 "Histoire-Géographie",
@@ -292,7 +316,7 @@ def get_full_subject_list():
                 "Sciences Physiques et Mathématiques appliquées"
             ]
 
-        # CASE B: STMG (Technologique)
+        # --- CAS : STMG (Technologique) ---
         elif voie == "Technologique" and serie == "STMG":
             return [
                 "Français" if level == "Première" else "Philosophie",
@@ -307,7 +331,7 @@ def get_full_subject_list():
                 "Enseignement Moral et Civique"
             ]
 
-        # CASE C: Voie Générale
+        # --- CAS : VOIE GÉNÉRALE ---
         elif voie == "Générale":
             subjects = [
                 "Français" if level == "Première" else "Philosophie",
@@ -321,16 +345,6 @@ def get_full_subject_list():
             subjects.extend(specs)
             return subjects
             
-        # CASE D: Other Tech Series (Placeholder)
-        elif voie == "Technologique":
-            return [
-                "Français" if level == "Première" else "Philosophie",
-                "Histoire-Géographie",
-                "Mathématiques",
-                f"Spécialités {serie}",
-                "EPS"
-            ]
-    
     return []
 def show_level_audit():
     # 1. Safely determine which level name to display
