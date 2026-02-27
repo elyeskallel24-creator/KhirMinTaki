@@ -111,12 +111,9 @@ def show_signup():
     # --- SUBMIT BUTTON ---
     if st.button("Créer mon compte", use_container_width=True):
         if is_valid_email(email) and len(pwd) >= 8 and pwd == pwd_conf:
-            # Create the account in your DB
             st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {}}
-            
-            # LOG IN IMMEDIATELY
             st.session_state.user_data = {"email": email}
-            st.session_state.step = "bac_selection" # Skip login, go straight to setup
+            st.session_state.step = "bac_selection" # Changed from login
             st.rerun()
         else:
             st.error("Veuillez corriger les erreurs avant de continuer.")
@@ -161,8 +158,21 @@ def show_bac_selection():
     for opt in CORE_MAPPING.keys():
         if st.button(opt, use_container_width=True):
             st.session_state.user_data["bac_type"] = opt
-            st.session_state.step = "curriculum_selection" # Now goes to curriculum next
+            st.session_state.step = "curriculum_selection" # Changed from option_selection
             st.rerun()
+
+def show_curriculum_selection():
+    st.markdown("## 🌍 Quel est votre système ?")
+    
+    if st.button("🇹🇳 Baccalauréat Tunisien", use_container_width=True):
+        st.session_state.user_data["curriculum"] = "Tunisien"
+        st.session_state.step = "option_selection"
+        st.rerun()
+        
+    if st.button("🇫🇷 Baccalauréat Français", use_container_width=True):
+        st.session_state.user_data["curriculum"] = "Français"
+        st.session_state.step = "option_selection" 
+        st.rerun()
 
 def show_option_selection():
     st.markdown("## ✨ Choisissez votre Option")
@@ -297,26 +307,21 @@ def show_chat_diagnose():
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
-def show_curriculum_selection():
-    st.markdown("## 🌍 Quel est votre système ?")
-    
-    if st.button("🇹🇳 Baccalauréat Tunisien", use_container_width=True):
-        st.session_state.user_data["curriculum"] = "Tunisien"
-        st.session_state.step = "option_selection"
-        st.rerun()
-        
-    if st.button("🇫🇷 Baccalauréat Français", use_container_width=True):
-        st.session_state.user_data["curriculum"] = "Français"
-        st.session_state.step = "option_selection" 
-        st.rerun()
 
 # --- ROUTER ---
 pages = {
-    "landing": show_landing, "signup": show_signup, "login": show_login,
-    "bac_selection": show_bac_selection, "option_selection": show_option_selection,
-    "level_audit": show_level_audit, "philosophy": show_philosophy,
-    "dashboard": show_dashboard, "subscription": show_subscription,
-    "subject_hub": show_subject_hub, "chat_diagnose": show_chat_diagnose
+    "landing": show_landing, 
+    "signup": show_signup, 
+    "login": show_login,
+    "bac_selection": show_bac_selection, 
+    "curriculum_selection": show_curriculum_selection, # Add this line
+    "option_selection": show_option_selection,
+    "level_audit": show_level_audit, 
+    "philosophy": show_philosophy,
+    "dashboard": show_dashboard, 
+    "subscription": show_subscription,
+    "subject_hub": show_subject_hub, 
+    "chat_diagnose": show_chat_diagnose
 }
 
 if st.session_state.step in pages:
