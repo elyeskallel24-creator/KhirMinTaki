@@ -203,7 +203,7 @@ def show_fr_serie_selection():
     for s in series:
         if st.button(s, use_container_width=True):
             st.session_state.user_data["fr_serie"] = s
-            st.session_state.step = "level_audit" # Moves to the next major step
+            st.session_state.step = "level_audit" # This triggers the subject list we just built
             st.rerun()
 
 def show_fr_specialites_selection():
@@ -266,27 +266,49 @@ def get_full_subject_list():
     # 2. FRENCH FLOW
     elif curriculum == "Français":
         level = st.session_state.user_data.get("fr_level")
-        # Start with core subjects
-        subjects = [
-            "Français" if level == "Première" else "Philosophie",
-            "Histoire-Géographie",
-            "LVA (Anglais)",
-            "LVB",
-            "Enseignement Scientifique",
-            "EPS"
-        ]
-        
-        # Add Specialties (Générale) OR Series subjects (Technologique)
         voie = st.session_state.user_data.get("fr_voie")
-        if voie == "Générale":
+        serie = st.session_state.user_data.get("fr_serie")
+
+        # CASE A: STMG (Technologique)
+        if voie == "Technologique" and serie == "STMG":
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "Mathématiques",
+                "Langue Vivante A",
+                "Langue Vivante B",
+                "Management",
+                "Sciences de Gestion et Numérique",
+                "Droit et Économie",
+                "EPS",
+                "Enseignement Moral et Civique"
+            ]
+
+        # CASE B: Voie Générale
+        elif voie == "Générale":
+            subjects = [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "LVA (Anglais)",
+                "LVB",
+                "Enseignement Scientifique",
+                "EPS"
+            ]
             specs = st.session_state.user_data.get("fr_specialites", [])
             subjects.extend(specs)
+            return subjects
+            
+        # CASE C: Other Technologique series (Placeholder)
         elif voie == "Technologique":
-            serie = st.session_state.user_data.get("fr_serie")
-            if serie:
-                subjects.append(f"Spécialités {serie}")
-        
-        return subjects
+            return [
+                "Français" if level == "Première" else "Philosophie",
+                "Histoire-Géographie",
+                "LVA",
+                "LVB",
+                "Mathématiques",
+                f"Spécialités {serie}",
+                "EPS"
+            ]
     
     return []
 
