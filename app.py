@@ -159,7 +159,7 @@ def show_bac_selection():
     for opt in CORE_MAPPING.keys():
         if st.button(opt, use_container_width=True):
             st.session_state.user_data["bac_type"] = opt
-            st.session_state.step = "curriculum_selection" # Changed from option_selection
+            st.session_state.step = "option_selection" # Continues the flow
             st.rerun()
 
 def show_curriculum_selection():
@@ -167,12 +167,12 @@ def show_curriculum_selection():
     
     if st.button("🇹🇳 Baccalauréat Tunisien", use_container_width=True):
         st.session_state.user_data["curriculum"] = "Tunisien"
-        st.session_state.step = "option_selection"
+        st.session_state.step = "bac_selection" # Leads to Bac choice
         st.rerun()
         
     if st.button("🇫🇷 Baccalauréat Français", use_container_width=True):
         st.session_state.user_data["curriculum"] = "Français"
-        st.session_state.step = "option_selection" 
+        st.session_state.step = "bac_selection" # Leads to Bac choice
         st.rerun()
 
 def show_option_selection():
@@ -314,6 +314,7 @@ pages = {
     "landing": show_landing, 
     "signup": show_signup, 
     "login": show_login,
+    "curriculum_selection": show_curriculum_selection,
     "bac_selection": show_bac_selection, 
     "curriculum_selection": show_curriculum_selection, # Add this line
     "option_selection": show_option_selection,
