@@ -291,13 +291,35 @@ def get_full_subject_list():
     return []
 
 def show_level_audit():
-    st.markdown(f"## 📊 Niveau : {st.session_state.user_data['bac_type']}")
+    # 1. Safely determine which level name to display
+    user_info = st.session_state.user_data
+    curr = user_info.get("curriculum", "Tunisien")
+    
+    # Use bac_type for Tunisians, fr_level for French
+    if curr == "Tunisien":
+        level_display = user_info.get("bac_type", "Non défini")
+    else:
+        level_display = f"{user_info.get('fr_level', '')} {user_info.get('fr_voie', '')}"
+
+    st.markdown(f"## 📊 Niveau : {level_display}")
+    
+    # 2. Get the subjects list (this uses your updated get_full_subject_list)
     subjects = get_full_subject_list()
+    
+    if not subjects:
+        st.warning("Aucune matière trouvée pour ce profil.")
+        if st.button("Retour au début"):
+            st.session_state.step = "curriculum_selection"
+            st.rerun()
+        return
+
     assessment_levels = ["Insuffisant", "Fragile", "Satisfaisant", "Bien", "Très bien", "Excellent"]
     levels = {}
+    
     for sub in subjects:
         levels[sub] = st.select_slider(f"**{sub}**", options=assessment_levels, value="Satisfaisant", key=f"aud_{sub}")
         st.markdown("<hr>", unsafe_allow_html=True)
+        
     if st.button("Confirmer mon profil", use_container_width=True):
         st.session_state.user_data["levels"] = levels
         st.session_state.step = "philosophy"
