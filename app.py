@@ -109,11 +109,12 @@ def show_signup():
         st.markdown("<style>div[data-testid='stTextInput']:has(input[aria-label='Confirmez votre mot de passe']) div[data-baseweb='input'] { border: 2px solid #dc3545 !important; }</style>", unsafe_allow_html=True)
 
     # --- SUBMIT BUTTON ---
+    # Inside show_signup()
     if st.button("Créer mon compte", use_container_width=True):
         if is_valid_email(email) and len(pwd) >= 8 and pwd == pwd_conf:
             st.session_state.mock_db[email] = {"pwd": pwd, "profile_complete": False, "data": {}}
             st.session_state.user_data = {"email": email}
-            st.session_state.step = "bac_selection" # Changed from login
+            st.session_state.step = "curriculum_selection" # This is the change
             st.rerun()
         else:
             st.error("Veuillez corriger les erreurs avant de continuer.")
