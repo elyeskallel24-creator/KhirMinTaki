@@ -172,8 +172,66 @@ def show_curriculum_selection():
         
     if st.button("🇫🇷 Baccalauréat Français", use_container_width=True):
         st.session_state.user_data["curriculum"] = "Français"
-        st.session_state.step = "bac_selection" # Leads to Bac choice
+        st.session_state.step = "fr_level_selection" # New starting point
         st.rerun()
+
+def show_fr_level_selection():
+    st.markdown("## 📚 Votre niveau (Bac Français)")
+    if st.button("Première", use_container_width=True):
+        st.session_state.user_data["fr_level"] = "Première"
+        st.session_state.step = "fr_voie_selection"
+        st.rerun()
+    if st.button("Terminale", use_container_width=True):
+        st.session_state.user_data["fr_level"] = "Terminale"
+        st.session_state.step = "fr_voie_selection"
+        st.rerun()
+
+def show_fr_voie_selection():
+    st.markdown(f"## 🛣️ Sélectionnez votre voie ({st.session_state.user_data['fr_level']})")
+    if st.button("Voie Générale", use_container_width=True):
+        st.session_state.user_data["fr_voie"] = "Générale"
+        st.session_state.step = "fr_specialites_selection"
+        st.rerun()
+    if st.button("Voie Technologique", use_container_width=True):
+        st.session_state.user_data["fr_voie"] = "Technologique"
+        st.session_state.step = "fr_serie_selection"
+        st.rerun()
+
+def show_fr_serie_selection():
+    st.markdown("## 🔬 Choisissez votre série")
+    series = ["STMG", "STI2D", "STL", "ST2S", "STD2A", "STHR"]
+    for s in series:
+        if st.button(s, use_container_width=True):
+            st.session_state.user_data["fr_serie"] = s
+            st.session_state.step = "level_audit" # Moves to the next major step
+            st.rerun()
+
+def show_fr_specialites_selection():
+    level = st.session_state.user_data.get("fr_level")
+    limit = 3 if level == "Première" else 2
+    
+    st.markdown(f"## 🧪 Les spécialités ({level})")
+    st.info(f"Veuillez choisir exactement **{limit}** spécialités.")
+    
+    specs = [
+        "Mathématiques", "Physique-Chimie", "Sciences de la Vie et de la Terre",
+        "Sciences Économiques et Sociales", "HGGSP", "Numérique et Sciences Informatiques",
+        "Humanités, Littérature et Philosophie", "Langues étrangères approfondies"
+    ]
+    
+    # Use checkboxes for multiple selection
+    selected = []
+    for spec in specs:
+        if st.checkbox(spec, key=f"check_{spec}"):
+            selected.append(spec)
+    
+    if st.button("Confirmer mes spécialités", use_container_width=True):
+        if len(selected) == limit:
+            st.session_state.user_data["fr_specialites"] = selected
+            st.session_state.step = "level_audit"
+            st.rerun()
+        else:
+            st.error(f"Vous devez sélectionner exactement {limit} spécialités (actuellement : {len(selected)}).")
 
 def show_option_selection():
     st.markdown("## ✨ Choisissez votre Option")
@@ -184,12 +242,53 @@ def show_option_selection():
             st.session_state.step = "level_audit"
             st.rerun()
 
+FR_CORE_SUBJECTS = [
+    "Français (1re)" if "Première" else "Philosophie", 
+    "Histoire-Géographie", 
+    "LVA (Anglais)", 
+    "LVB", 
+    "Enseignement Scientifique", 
+    "EPS"
+]
+
 def get_full_subject_list():
-    bac = st.session_state.user_data.get("bac_type")
-    opt = st.session_state.user_data.get("selected_option")
-    subjects = CORE_MAPPING.get(bac, []).copy()
-    if opt: subjects.append(opt)
-    return subjects
+    curriculum = st.session_state.user_data.get("curriculum")
+    
+    # 1. TUNISIAN FLOW
+    if curriculum == "Tunisien":
+        bac = st.session_state.user_data.get("bac_type")
+        subjects = CORE_MAPPING.get(bac, []).copy()
+        opt = st.session_state.user_data.get("selected_option")
+        if opt: 
+            subjects.append(opt)
+        return subjects
+
+    # 2. FRENCH FLOW
+    elif curriculum == "Français":
+        level = st.session_state.user_data.get("fr_level")
+        # Start with core subjects
+        subjects = [
+            "Français" if level == "Première" else "Philosophie",
+            "Histoire-Géographie",
+            "LVA (Anglais)",
+            "LVB",
+            "Enseignement Scientifique",
+            "EPS"
+        ]
+        
+        # Add Specialties (Générale) OR Series subjects (Technologique)
+        voie = st.session_state.user_data.get("fr_voie")
+        if voie == "Générale":
+            specs = st.session_state.user_data.get("fr_specialites", [])
+            subjects.extend(specs)
+        elif voie == "Technologique":
+            serie = st.session_state.user_data.get("fr_serie")
+            if serie:
+                subjects.append(f"Spécialités {serie}")
+        
+        return subjects
+    
+    return []
 
 def show_level_audit():
     st.markdown(f"## 📊 Niveau : {st.session_state.user_data['bac_type']}")
@@ -316,7 +415,10 @@ pages = {
     "login": show_login,
     "curriculum_selection": show_curriculum_selection,
     "bac_selection": show_bac_selection, 
-    "curriculum_selection": show_curriculum_selection, # Add this line
+    "fr_level_selection": show_fr_level_selection,
+    "fr_voie_selection": show_fr_voie_selection,
+    "fr_serie_selection": show_fr_serie_selection,
+    "fr_specialites_selection": show_fr_specialites_selection,
     "option_selection": show_option_selection,
     "level_audit": show_level_audit, 
     "philosophy": show_philosophy,
