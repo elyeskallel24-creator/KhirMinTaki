@@ -579,8 +579,8 @@ def show_subject_hub():
     subject_emojis = {
         # Tronc Commun & Tunisien
         "Mathématiques": "📐", "Physique": "⚛️", "Physique-Chimie": "🧪", 
-        "SVT": "🧬", "Informatique": "💻", "Philosophie": "📜", 
-        "Arabe": "🇹🇳", "Français": "🇫🇷", "Anglais": "🇬🇧", 
+        "SVT": "🧬", "Informatique": "💻", "Philosophie": "📜",
+        "Arabe": "🇹🇳", "Français": "🇫🇷", "Anglais": "🇬🇧", "Allemand": "🇩🇪","Espagnol": "🇪🇸","Italien": "🇮🇹","Russe": "🇷🇺","Chinois": "🇨🇳",
         "Économie": "📈", "Gestion": "💼", "Histoire-Géographie": "🌍", 
         "LVA (Anglais)": "🇬🇧", "LVB": "🌍", "EPS": "🏃", "EPS (Sport)": "🏃",
         "Enseignement Moral et Civique (EMC)": "🗳️", "Enseignement Scientifique": "🧬",
