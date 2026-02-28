@@ -664,15 +664,14 @@ def show_chat_diagnose():
 
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
 
-    # 2. Progress Bar (Only shows during questioning)
+    # 2. Progress Bar
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
 
-    # 3. MISSION Y: Chapter Selection Phase
+    # 3. MISSION Y: Chapter Selection Phase (Mandatory Selection)
     if st.session_state.diag_step == "get_chapter":
         st.write("### 📚 Choisissez votre chapitre")
         
-        # [cite_start]Fetch the official chapters using our Data Bank [cite: 95, 96]
         user_info = st.session_state.user_data
         chapters = get_chapters_by_subject(
             user_info.get("curriculum", "Tunisien"),
@@ -680,19 +679,16 @@ def show_chat_diagnose():
             st.session_state.selected_subject
         )
 
-        # Display chapters as clickable buttons
         for chap in chapters:
             if st.button(chap, use_container_width=True, key=f"btn_{chap}"):
                 st.session_state.current_chapter = chap
                 st.session_state.diag_step = "questioning"
                 st.session_state.q_count = 1
-                
-                # Add the selection to history so the AI knows where to start
                 st.session_state.messages.append({"role": "user", "content": f"Je choisis le chapitre : {chap}"})
                 st.rerun()
-        return # Stop here until a chapter is clicked
+        return 
 
-    # 4. Display Messages (Questioning Phase)
+    # 4. Display Messages
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): 
             st.markdown(m["content"])
@@ -703,14 +699,12 @@ def show_chat_diagnose():
         
         with st.chat_message("assistant"):
             try:
-                [cite_start]system_instruction = get_ai_system_prompt() [cite: 95]
+                system_instruction = get_ai_system_prompt()
                 
-                # Build context for Groq
                 messages_for_groq = [{"role": "system", "content": system_instruction}]
                 for m in st.session_state.messages:
                     messages_for_groq.append({"role": m["role"], "content": m["content"]})
 
-                # Special instruction if it's the very first AI response
                 if st.session_state.q_count == 1:
                     messages_for_groq.append({
                         "role": "system", 
@@ -725,7 +719,6 @@ def show_chat_diagnose():
                 ai_text = chat_completion.choices[0].message.content
                 st.session_state.q_count += 1
 
-                # Handle Completion
                 if st.session_state.q_count > 10:
                     ai_text += "\n\n**Diagnostic terminé !** Ton plan de révision est prêt dans l'onglet 'Plans'."
                     st.session_state.user_data["plan_ready"] = True
