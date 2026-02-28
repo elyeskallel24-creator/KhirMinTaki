@@ -5,12 +5,12 @@ from groq import Groq
 from supabase import create_client
 
 # --- 1. INITIAL SETUP ---
+import google.generativeai.types as types # Add this import
+
 try:
-    # Explicitly setting the API key
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     
-    # ADD THIS LINE: It forces the library to use the stable V1 API
-    # instead of the v1beta that is causing your 404 error.
+    # FORCE STABLE API: This is the magic line to stop the 404 v1beta error
     from google.generativeai import client
     client.DEFAULT_API_VERSION = "v1"
     
@@ -691,7 +691,7 @@ def show_chat_diagnose():
                 
                 # STEP B: Initialize the Gemini Model with the explicit path
                 # This 'models/' prefix is required to avoid the 404 error
-                model = genai.GenerativeModel(model_name='gemini-1.5-flash')
+                model = genai.GenerativeModel(model_name='gemini-pro')
                 
                 # STEP C: Determine the Logic Flow (Chapter vs. Follow-up Questions)
                 if st.session_state.diag_step == "get_chapter":
