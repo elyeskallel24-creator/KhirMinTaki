@@ -486,45 +486,52 @@ def show_level_audit():
 def show_philosophy():
     st.markdown("## 🧠 Votre philosophie d'apprentissage")
     st.write("Décrivez en détail comment vous souhaitez que votre professeur IA interagisse avec vous.")
-    
-    # 1. The Text Area for the user's input
+
+    # 1. Logic to sync text and character count instantly
+    if "temp_philosophy" not in st.session_state:
+        st.session_state.temp_philosophy = ""
+
+    # This function is triggered every time a key is pressed (if supported) 
+    # or the widget loses focus. 
+    # To get "real-time" in Streamlit, we ensure the value is tracked.
     user_philosophy = st.text_area(
-        "Ma méthode préférée (ex: Je veux quelqu'un de patient qui donne beaucoup d'exemples concrets...)",
-        placeholder="Décrivez votre style d'apprentissage idéal...",
+        "Ma méthode préférée...",
+        value=st.session_state.temp_philosophy,
+        placeholder="Soyez précis : 'Je veux quelqu'un qui me donne des astuces pour gagner du temps et qui m'encourage...'",
         height=150,
-        key="philosophy_input"
+        key="philosophy_area"
     )
+
+    # Update the internal state
+    st.session_state.temp_philosophy = user_philosophy
     
-    # 2. Character Count Logic
+    # 2. Character Count and Progress Bar
     char_count = len(user_philosophy)
-    remaining = 80 - char_count
+    progress = min(char_count / 80, 1.0)
+    
+    # Visual feedback
+    st.progress(progress)
     
     if char_count < 80:
-        st.warning(f"⚠️ Encore {remaining} caractères minimum pour continuer.")
-        # Progress bar to visualize the requirement
-        st.progress(char_count / 80)
+        remaining = 80 - char_count
+        st.warning(f"✍️ Encore {remaining} caractères pour débloquer la suite.")
     else:
-        st.success("✅ Description suffisante ! Vous pouvez maintenant valider.")
-        st.progress(1.0)
+        st.success("✅ Parfait ! Votre profil est complet.")
 
     # 3. Validation Button
-    # The button is only enabled if the character count is 80 or more
     if st.button("Confirmer et accéder au Dashboard", 
                  use_container_width=True, 
                  disabled=(char_count < 80)):
         
-        # Save the custom text to session state
         st.session_state.user_data["philosophy"] = user_philosophy
         st.session_state.user_data["profile_complete"] = True
-        
-        st.balloons() # Nice visual effect for finishing the profile
         st.session_state.step = "dashboard"
+        st.balloons()
         st.rerun()
 
     if st.button("← Retour"):
         st.session_state.step = "level_audit"
         st.rerun()
-
 # --- MAIN DASHBOARD & FEATURES ---
 
 def show_dashboard():
