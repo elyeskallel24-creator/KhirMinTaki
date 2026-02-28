@@ -689,8 +689,8 @@ pages = {
     "dashboard": show_dashboard, 
     "subscription": show_subscription,
     "subject_hub": show_subject_hub, 
-    "chat_diagnose": show_chat_diagnose
-    "view_plan": show_view_plan
+    "chat_diagnose": show_chat_diagnose,
+    "view_plan": show_view_plan,
 }
 
 # 1. Get the current step safely (defaults to "landing" if not set)
