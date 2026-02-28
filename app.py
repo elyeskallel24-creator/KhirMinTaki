@@ -131,12 +131,21 @@ def show_login():
     if st.button("Se connecter", use_container_width=True):
         user_entry = st.session_state.mock_db.get(email_log)
         if user_entry and user_entry["pwd"] == pwd_log:
-            st.session_state.user_data = user_entry["data"]
+            # 1. Ensure user_data is a dictionary even if "data" was empty
+            db_data = user_entry.get("data", {})
+            
+            # 2. Use .update() to merge database info into the current session 
+            # without deleting what's already there
+            st.session_state.user_data.update(db_data)
+            
+            # 3. Explicitly set the email to ensure it's always present
             st.session_state.user_data["email"] = email_log
-            if user_entry["profile_complete"]:
+            
+            # 4. Check profile status and redirect
+            if user_entry.get("profile_complete"):
                 st.session_state.step = "dashboard"
             else:
-                st.session_state.step = "bac_selection"
+                st.session_state.step = "curriculum_selection"
             st.rerun()
         else:
             st.markdown("<p class='validation-msg error-text'>Email ou mot de passe incorrect</p>", unsafe_allow_html=True)
@@ -478,7 +487,6 @@ def show_philosophy():
     st.markdown("## 🧠 Votre philosophie d'apprentissage")
     st.write("Comment souhaitez-vous que votre professeur IA interagisse avec vous ?")
 
-    # On définit les options
     philosophies = {
         "Socratique": "Pose des questions pour vous faire réfléchir.",
         "Pragmatique": "Direct, axé sur les exercices et les résultats.",
@@ -486,22 +494,15 @@ def show_philosophy():
         "Rigoureux": "Précis, ne laisse passer aucune erreur."
     }
 
-    # Affichage des choix
     for name, desc in philosophies.items():
         if st.button(f"{name} : {desc}", use_container_width=True):
-            # 1. On enregistre la philosophie choisie
+            # 1. Save the choice
             st.session_state.user_data["philosophy"] = name
             
-            # --- BLOC DE DÉBOGAGE (À garder le temps des tests) ---
-            st.success(f"Philosophie {name} enregistrée !")
-            st.write("Vérification finale de votre profil avant le Dashboard :")
-            st.json(st.session_state.user_data) # st.json est plus lisible que st.write
+            # 2. Mark the profile as complete (Important for future logins!)
+            st.session_state.user_data["profile_complete"] = True
             
-            import time
-            time.sleep(3) # On laisse 3 secondes pour vérifier les données
-            # -------------------------------------------------------
-
-            # 2. Passage au tableau de bord
+            # 3. Direct transition to dashboard
             st.session_state.step = "dashboard"
             st.rerun()
 
@@ -654,6 +655,20 @@ def show_chat_diagnose():
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
+def show_view_plan():
+    st.markdown("## 📅 Votre Plan de Révision")
+    st.write("Voici votre programme personnalisé basé sur le diagnostic.")
+    
+    # Optional: Check if the user actually has a plan
+    if st.session_state.user_data.get("plan_ready"):
+        st.success("Votre plan est prêt ! Voici vos prochaines étapes...")
+        # You can add more details here later
+    else:
+        st.info("Complétez un diagnostic avec l'AI Professor pour générer votre plan.")
+
+    if st.button("← Retour au Dashboard", use_container_width=True):
+        st.session_state.step = "dashboard"
+        st.rerun()
 
 # --- ROUTER ---
 # This dictionary maps the step name to the corresponding function.
@@ -675,6 +690,7 @@ pages = {
     "subscription": show_subscription,
     "subject_hub": show_subject_hub, 
     "chat_diagnose": show_chat_diagnose
+    "view_plan": show_view_plan
 }
 
 # 1. Get the current step safely (defaults to "landing" if not set)
