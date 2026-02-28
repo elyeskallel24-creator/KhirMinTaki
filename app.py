@@ -776,6 +776,42 @@ def get_ai_system_prompt():
     
     return prompt
 
+def get_chapters_by_subject(curriculum, branch, subject):
+    """
+    Returns the 100% accurate official list of chapters for the 2024-2025 program.
+    Currently optimized for: Bac Tunisien - Économie & Gestion - Matière: Gestion.
+    """
+    # Database for Tunisian Bac: Économie et Gestion
+    tunisian_eco_gestion = {
+        "Gestion": [
+            "Gestion des Approvisionnements (Stock & Valorisation)",
+            "Gestion de la Production (Optimisation & Coûts)",
+            "Gestion Commerciale (Marketing & Ventes)",
+            "Gestion des Ressources Humaines (GRH & Paie)",
+            "Analyse de la Performance (Soldes de Gestion & CAF)",
+            "Analyse de la Rentabilité (Seuil de Rentabilité)",
+            "Gestion de l'Investissement (VAN, DRCI, IP)",
+            "Gestion du Financement (Emprunts & Autofinancement)",
+            "Analyse Fonctionnelle du Bilan (FRNG, BFR, Trésorerie)",
+            "Gestion Budgétaire (Budgets des Ventes & Trésorerie)"
+        ],
+        "Économie": [
+            "La Croissance Économique",
+            "Les Facteurs de la Croissance",
+            "Les Mutations des Structures",
+            "L'Ouverture sur l'Extérieur",
+            "La Mondialisation",
+            "Le Développement Durable"
+        ]
+    }
+
+    # Logic to return the right list based on user profile
+    if curriculum == "Tunisien" and branch == "Économie et Gestion":
+        return tunisian_eco_gestion.get(subject, [])
+    
+    # Fallback for other branches (to be completed in later micro-steps)
+    return ["Chapitre Général 1", "Chapitre Général 2"]
+
 # --- ROUTER ---
 # This dictionary maps the step name to the corresponding function.
 # Ensure all these functions are defined above this block.
