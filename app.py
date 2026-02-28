@@ -485,26 +485,45 @@ def show_level_audit():
 
 def show_philosophy():
     st.markdown("## 🧠 Votre philosophie d'apprentissage")
-    st.write("Comment souhaitez-vous que votre professeur IA interagisse avec vous ?")
+    st.write("Décrivez en détail comment vous souhaitez que votre professeur IA interagisse avec vous.")
+    
+    # 1. The Text Area for the user's input
+    user_philosophy = st.text_area(
+        "Ma méthode préférée (ex: Je veux quelqu'un de patient qui donne beaucoup d'exemples concrets...)",
+        placeholder="Décrivez votre style d'apprentissage idéal...",
+        height=150,
+        key="philosophy_input"
+    )
+    
+    # 2. Character Count Logic
+    char_count = len(user_philosophy)
+    remaining = 80 - char_count
+    
+    if char_count < 80:
+        st.warning(f"⚠️ Encore {remaining} caractères minimum pour continuer.")
+        # Progress bar to visualize the requirement
+        st.progress(char_count / 80)
+    else:
+        st.success("✅ Description suffisante ! Vous pouvez maintenant valider.")
+        st.progress(1.0)
 
-    philosophies = {
-        "Socratique": "Pose des questions pour vous faire réfléchir.",
-        "Pragmatique": "Direct, axé sur les exercices et les résultats.",
-        "Bienveillant": "Encourageant, idéal pour reprendre confiance.",
-        "Rigoureux": "Précis, ne laisse passer aucune erreur."
-    }
+    # 3. Validation Button
+    # The button is only enabled if the character count is 80 or more
+    if st.button("Confirmer et accéder au Dashboard", 
+                 use_container_width=True, 
+                 disabled=(char_count < 80)):
+        
+        # Save the custom text to session state
+        st.session_state.user_data["philosophy"] = user_philosophy
+        st.session_state.user_data["profile_complete"] = True
+        
+        st.balloons() # Nice visual effect for finishing the profile
+        st.session_state.step = "dashboard"
+        st.rerun()
 
-    for name, desc in philosophies.items():
-        if st.button(f"{name} : {desc}", use_container_width=True):
-            # 1. Save the choice
-            st.session_state.user_data["philosophy"] = name
-            
-            # 2. Mark the profile as complete (Important for future logins!)
-            st.session_state.user_data["profile_complete"] = True
-            
-            # 3. Direct transition to dashboard
-            st.session_state.step = "dashboard"
-            st.rerun()
+    if st.button("← Retour"):
+        st.session_state.step = "level_audit"
+        st.rerun()
 
 # --- MAIN DASHBOARD & FEATURES ---
 
