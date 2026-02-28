@@ -660,71 +660,76 @@ def show_subject_hub():
                 st.rerun()
 
 def show_chat_diagnose():
-    # 1. Back button to return to the subject selection
+    # 1. Back Navigation
     if st.button("← Quitter le chat"):
         st.session_state.step = "subject_hub"
         st.rerun()
 
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
 
-    # 2. Progress bar for the 10-question diagnostic
+    # 2. Progress Bar
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
 
-    # 3. Initialize the conversation if empty
+    # 3. Initial Greeting
     if not st.session_state.get("messages"):
         intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
         st.session_state.messages = [{"role": "assistant", "content": intro}]
 
-    # 4. Display the chat history
+    # 4. Display Messages
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): 
             st.markdown(m["content"])
 
-    # 5. Handle User Input
+    # 5. Chat Logic
     if prompt := st.chat_input("Réponds ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with st.chat_message("assistant"):
             try:
-                # STEP A: Fetch the Student's Identity Card (Mission X Core)
+                # A. Get Profile Data
                 system_instruction = get_ai_system_prompt()
                 
-                # STEP B: Initialize the Gemini Model with the explicit path
-                # This 'models/' prefix is required to avoid the 404 error
-                model = genai.GenerativeModel('gemini-pro')
-                
-                # STEP C: Determine the Logic Flow (Chapter vs. Follow-up Questions)
+                # B. Handle Flow (Chapter vs Questions)
                 if st.session_state.diag_step == "get_chapter":
                     st.session_state.current_chapter = prompt
                     st.session_state.diag_step = "questioning"
                     st.session_state.q_count = 1
-                    user_query = f"L'élève veut réviser le chapitre : '{prompt}'. Salue-le brièvement et pose la Question 1."
+                    user_query = f"L'élève veut réviser le chapitre : '{prompt}'. Salue-le et pose la Question 1."
                 else:
                     st.session_state.q_count += 1
                     user_query = prompt
 
-                # STEP D: Combine Profile + History + Query for full context
-                full_context = f"{system_instruction}\n\nHistorique du chat: {st.session_state.messages}\n\nInstruction actuelle: {user_query}"
+                # C. Build History for Groq (Memory)
+                messages_for_groq = [{"role": "system", "content": system_instruction}]
+                for m in st.session_state.messages:
+                    messages_for_groq.append({"role": m["role"], "content": m["content"]})
                 
-                # STEP E: API Call to Gemini
-                response = model.generate_content(full_context)
-                ai_text = response.text
+                # If we just added the user_query via flow logic, ensure it's the last message
+                if st.session_state.diag_step == "questioning" and st.session_state.q_count == 1:
+                     messages_for_groq.append({"role": "user", "content": user_query})
 
-                # STEP F: Handle Diagnostic Completion (10 Questions)
+                # D. API Call
+                chat_completion = groq_client.chat.completions.create(
+                    messages=messages_for_groq,
+                    model="llama3-8b-8192",
+                )
+                
+                ai_text = chat_completion.choices[0].message.content
+
+                # E. Handle Completion
                 if st.session_state.q_count >= 10:
-                    ai_text += "\n\n**Diagnostic terminé !** Ton plan de révision est maintenant prêt dans l'onglet 'Plans'."
+                    ai_text += "\n\n**Diagnostic terminé !** Ton plan de révision est prêt dans l'onglet 'Plans'."
                     st.session_state.user_data["plan_ready"] = True
                     st.session_state.diag_step = "finished"
 
-                # STEP G: Display the result and update session history
+                # F. Update UI and Session
                 st.markdown(ai_text)
                 st.session_state.messages.append({"role": "assistant", "content": ai_text})
                 st.rerun()
 
             except Exception as e:
-                # Displays any remaining API or connection errors
-                st.error(f"Erreur avec l'IA : {e}")
+                st.error(f"Erreur avec Groq : {e}")
 
 def show_view_plan():
     st.markdown("## 📅 Votre Plan de Révision")
