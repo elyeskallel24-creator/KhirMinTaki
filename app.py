@@ -629,31 +629,81 @@ def show_subject_hub():
                 st.rerun()
 
 def show_chat_diagnose():
+    # --- 1. SESSIONS & PROFILE CHECK ---
+    if "selected_subject" not in st.session_state:
+        st.session_state.step = "subject_hub"
+        st.rerun()
+
+    # Back button to escape the chat
     if st.button("← Quitter le chat"):
         st.session_state.step = "subject_hub"
         st.rerun()
-    st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
+
+    subject = st.session_state.selected_subject
+    data = st.session_state.user_data
+    
+    # Building the AI Identity (System Prompt)
+    # This is hidden from the user but sent to the AI
+    system_instruction = f"""
+    Tu es "AI Professor", un tuteur expert en {subject}.
+    PROFIL DE L'ÉTUDIANT:
+    - Système: {data.get('curriculum', 'Tunisien')}
+    - Niveau: {data.get('fr_level', 'Bac')} {data.get('bac_type') or data.get('fr_serie', 'Générale')}
+    - Auto-évaluation en {subject}: {data.get('levels', {}).get(subject, 'Satisfaisant')}
+    - Philosophie demandée: "{data.get('philosophy', 'Sois un tuteur encourageant.')}"
+    
+    MISSION:
+    1. Commence par demander à l'élève quel chapitre de {subject} il souhaite réviser aujourd'hui.
+    2. Une fois le chapitre donné, pose 10 questions de diagnostic progressives.
+    3. Respecte STRICTEMENT la philosophie de l'étudiant dans ton ton et tes explications.
+    4. À la fin (10/10), annonce que le diagnostic est terminé et que son plan est prêt.
+    """
+
+    st.markdown(f"### 👨‍🏫 Tuteur : {subject}")
+
+    # --- 2. INITIALIZE CHAT HISTORY ---
+    if "messages" not in st.session_state or not st.session_state.messages:
+        # We don't show the system instruction to the user, just the first greeting
+        st.session_state.messages = []
+        intro_text = f"Asslema! Je suis ton tuteur en **{subject}**. Quel chapitre étudions-nous aujourd'hui ?"
+        st.session_state.messages.append({"role": "assistant", "content": intro_text})
+
+    # Display progress bar only during questioning
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
-    if not st.session_state.get("messages"):
-        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
-        st.session_state.messages = [{"role": "assistant", "content": intro}]
+
+    # Display existing messages
     for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.markdown(m["content"])
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+
+    # --- 3. CHAT INPUT & AI LOGIC ---
     if prompt := st.chat_input("Réponds ici..."):
+        # Add user message to UI
         st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Logic for the Diagnostic Flow
         with st.chat_message("assistant"):
-            if st.session_state.diag_step == "get_chapter":
+            if st.session_state.get("diag_step") == "get_chapter":
                 st.session_state.current_chapter = prompt
                 st.session_state.diag_step = "questioning"
                 st.session_state.q_count = 1
-                response = f"D'accord, le chapitre **{prompt}**. Question 1: ..."
-            elif st.session_state.q_count < 10:
+                
+                # Here you would normally call the Gemini API
+                response = f"C'est parti pour le chapitre **{prompt}**. Voici la Question 1 : ..."
+            
+            elif st.session_state.get("q_count", 0) < 10:
                 st.session_state.q_count += 1
-                response = f"Question {st.session_state.q_count}: [Analyse...]"
+                # placeholder for AI response
+                response = f"Très bien. Question {st.session_state.q_count} : [L'IA analyse ton niveau...]"
+            
             else:
-                response = "Diagnostic terminé !"
+                response = "Diagnostic terminé ! Ton plan de révision personnalisé a été généré dans l'onglet 'Plans'."
                 st.session_state.user_data["plan_ready"] = True
+                st.session_state.diag_step = "finished"
+
             st.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
@@ -672,6 +722,39 @@ def show_view_plan():
     if st.button("← Retour au Dashboard", use_container_width=True):
         st.session_state.step = "dashboard"
         st.rerun()
+
+def get_ai_system_prompt():
+    data = st.session_state.user_data
+    
+    # Extract profile details
+    curriculum = data.get("curriculum", "Inconnu")
+    level = data.get("fr_level", "")
+    section = data.get("bac_type") or data.get("fr_serie", data.get("fr_voie", "Générale"))
+    philosophy = data.get("philosophy", "Sois un professeur bienveillant.")
+    subject = st.session_state.get("selected_subject", "Matière générale")
+    
+    # Get specific levels for subjects if they exist
+    subject_levels = data.get("levels", {})
+    student_level = subject_levels.get(subject, "Satisfaisant")
+
+    # The Final Master Instruction
+    prompt = f"""
+    Tu es "AI Professor", un tuteur expert pour le système {curriculum}.
+    INFOS ÉTUDIANT:
+    - Niveau: {level} {section}
+    - Matière actuelle: {subject}
+    - Niveau auto-évalué en {subject}: {student_level}
+    
+    PHILOSOPHIE D'ENSEIGNEMENT DEMANDÉE:
+    "{philosophy}"
+    
+    CONSIGNES:
+    1. Adapte ton langage au programme officiel du {curriculum}.
+    2. Utilise la philosophie demandée par l'étudiant pour ton ton et ta méthode.
+    3. Ne donne pas les réponses directement; guide l'élève par le raisonnement.
+    4. Parle principalement en Français, mais tu peux utiliser quelques mots de "Tunsi" (Daja) si le curriculum est Tunisien pour créer un lien.
+    """
+    return prompt
 
 # --- ROUTER ---
 # This dictionary maps the step name to the corresponding function.
