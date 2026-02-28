@@ -5,17 +5,14 @@ from groq import Groq
 from supabase import create_client
 
 # --- 1. INITIAL SETUP ---
-import google.generativeai as genai
-from google.generativeai import client
-
 try:
-    # 1. Force the API version to 'v1' globally
-    client.DEFAULT_API_VERSION = 'v1'
-    
-    # 2. Configure the key
+    # 1. Standard Gemini Config (keep it for later if needed)
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     
+    # 2. Groq Config (Our main engine for Mission X)
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+    
+    # 3. Supabase Config
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
     st.error(f"Setup Error: {e}")
@@ -754,25 +751,28 @@ def get_ai_system_prompt():
     # 2. Extract specific profile details
     curriculum = data.get("curriculum", "Inconnu")
     level = data.get("fr_level", "")
-    # Branch finds the section (Tunisian) or the Series/Voie (French)
+    
+    # Get the branch (handles both Tunisian and French logic)
     branch = data.get("bac_type") or data.get("fr_serie", data.get("fr_voie", "Générale"))
+    
+    # Use the custom philosophy the user wrote during signup
     philosophy = data.get("philosophy", "Sois un tuteur bienveillant.")
     
     # 3. Get the student's specific level for this subject
     subject_levels = data.get("levels", {})
     student_level = subject_levels.get(subject, "Satisfaisant")
 
-    # 4. Build the Instruction String (Mission X Core)
-    # We use += to avoid the triple-quote "blue code" glitch
+    # 4. Build the Instruction String
     prompt = f"Tu es 'AI Professor', un tuteur expert pour le système {curriculum}. "
     prompt += f"L'élève est en classe de {level} {branch}. "
     prompt += f"Sa matière actuelle est {subject}, et son niveau auto-évalué est '{student_level}'. "
-    prompt += f"PHILOSOPHIE DEMANDÉE : '{philosophy}'. "
+    prompt += f"PHILOSOPHIE PERSONNALISÉE DE L'ÉLÈVE : '{philosophy}'. "
     prompt += "CONSIGNES : 1. Ne donne jamais la réponse directement. "
     prompt += "2. Guide l'élève par le raisonnement et des indices. "
     
+    # Specific instruction for Tunisian students
     if curriculum == "Tunisien":
-        prompt += "3. Puisque le système est Tunisien, utilise parfois des mots en 'Tunsi' (Derja) pour créer un lien."
+        prompt += "3. Puisque le système est Tunisien, utilise parfois des mots en 'Tunsi' (Derja) pour créer un lien de proximité."
     
     return prompt
 
