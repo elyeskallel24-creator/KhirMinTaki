@@ -664,70 +664,79 @@ def show_chat_diagnose():
 
     st.markdown(f"### 👨‍🏫 Tuteur : {st.session_state.selected_subject}")
 
-    # 2. Progress Bar
+    # 2. Progress Bar (Only shows during questioning)
     if st.session_state.get("diag_step") == "questioning":
         st.progress(st.session_state.q_count / 10, text=f"Diagnostic : {st.session_state.q_count}/10")
 
-    # 3. Initial Greeting
-    if not st.session_state.get("messages"):
-        intro = f"Asslema! Je suis ton tuteur en {st.session_state.selected_subject}. Quel chapitre étudions-nous ?"
-        st.session_state.messages = [{"role": "assistant", "content": intro}]
+    # 3. MISSION Y: Chapter Selection Phase
+    if st.session_state.diag_step == "get_chapter":
+        st.write("### 📚 Choisissez votre chapitre")
+        
+        # [cite_start]Fetch the official chapters using our Data Bank [cite: 95, 96]
+        user_info = st.session_state.user_data
+        chapters = get_chapters_by_subject(
+            user_info.get("curriculum", "Tunisien"),
+            user_info.get("bac_type", "Sciences Économiques et Gestion"),
+            st.session_state.selected_subject
+        )
 
-    # 4. Display Messages
+        # Display chapters as clickable buttons
+        for chap in chapters:
+            if st.button(chap, use_container_width=True, key=f"btn_{chap}"):
+                st.session_state.current_chapter = chap
+                st.session_state.diag_step = "questioning"
+                st.session_state.q_count = 1
+                
+                # Add the selection to history so the AI knows where to start
+                st.session_state.messages.append({"role": "user", "content": f"Je choisis le chapitre : {chap}"})
+                st.rerun()
+        return # Stop here until a chapter is clicked
+
+    # 4. Display Messages (Questioning Phase)
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): 
             st.markdown(m["content"])
 
-    # 5. Chat Logic
+    # 5. Chat Logic (Llama 3.1)
     if prompt := st.chat_input("Réponds ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with st.chat_message("assistant"):
             try:
-                # A. Get Profile Data (The "Identity Card" from Mission X)
-                system_instruction = get_ai_system_prompt()
+                [cite_start]system_instruction = get_ai_system_prompt() [cite: 95]
                 
-                # B. Handle Flow (Chapter vs Questions)
-                if st.session_state.diag_step == "get_chapter":
-                    st.session_state.current_chapter = prompt
-                    st.session_state.diag_step = "questioning"
-                    st.session_state.q_count = 1
-                    user_query = f"L'élève veut réviser le chapitre : '{prompt}'. Salue-le et pose la Question 1."
-                else:
-                    st.session_state.q_count += 1
-                    user_query = prompt
-
-                # C. Build History for Groq (Memory)
+                # Build context for Groq
                 messages_for_groq = [{"role": "system", "content": system_instruction}]
                 for m in st.session_state.messages:
                     messages_for_groq.append({"role": m["role"], "content": m["content"]})
-                
-                # Ensure the new logic query is part of the context
-                if st.session_state.diag_step == "questioning" and st.session_state.q_count == 1:
-                     messages_for_groq.append({"role": "user", "content": user_query})
 
-                # D. API Call to the NEW model
+                # Special instruction if it's the very first AI response
+                if st.session_state.q_count == 1:
+                    messages_for_groq.append({
+                        "role": "system", 
+                        "content": f"L'élève a choisi '{st.session_state.current_chapter}'. Salue-le brièvement et pose la Question 1."
+                    })
+
                 chat_completion = groq_client.chat.completions.create(
                     messages=messages_for_groq,
-                    model="llama-3.1-8b-instant", # The updated free model
+                    model="llama-3.1-8b-instant", 
                 )
                 
                 ai_text = chat_completion.choices[0].message.content
+                st.session_state.q_count += 1
 
-                # E. Handle Completion
-                if st.session_state.q_count >= 10:
+                # Handle Completion
+                if st.session_state.q_count > 10:
                     ai_text += "\n\n**Diagnostic terminé !** Ton plan de révision est prêt dans l'onglet 'Plans'."
                     st.session_state.user_data["plan_ready"] = True
                     st.session_state.diag_step = "finished"
 
-                # F. Update UI and Session
                 st.markdown(ai_text)
                 st.session_state.messages.append({"role": "assistant", "content": ai_text})
                 st.rerun()
 
             except Exception as e:
                 st.error(f"Erreur avec Groq : {e}")
-
 def show_view_plan():
     st.markdown("## 📅 Votre Plan de Révision")
     st.write("Voici votre programme personnalisé basé sur le diagnostic.")
