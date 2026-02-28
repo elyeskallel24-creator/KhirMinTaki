@@ -684,7 +684,7 @@ def show_chat_diagnose():
         
         with st.chat_message("assistant"):
             try:
-                # A. Get Profile Data
+                # A. Get Profile Data (The "Identity Card" from Mission X)
                 system_instruction = get_ai_system_prompt()
                 
                 # B. Handle Flow (Chapter vs Questions)
@@ -702,14 +702,14 @@ def show_chat_diagnose():
                 for m in st.session_state.messages:
                     messages_for_groq.append({"role": m["role"], "content": m["content"]})
                 
-                # If we just added the user_query via flow logic, ensure it's the last message
+                # Ensure the new logic query is part of the context
                 if st.session_state.diag_step == "questioning" and st.session_state.q_count == 1:
                      messages_for_groq.append({"role": "user", "content": user_query})
 
-                # D. API Call
+                # D. API Call to the NEW model
                 chat_completion = groq_client.chat.completions.create(
                     messages=messages_for_groq,
-                    model="llama3-8b-8192",
+                    model="llama-3.1-8b-instant", # The updated free model
                 )
                 
                 ai_text = chat_completion.choices[0].message.content
