@@ -665,21 +665,46 @@ def show_chat_diagnose():
         with st.chat_message(m["role"]): st.markdown(m["content"])
     if prompt := st.chat_input("Réponds ici..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
+        
         with st.chat_message("assistant"):
-            if st.session_state.diag_step == "get_chapter":
-                st.session_state.current_chapter = prompt
-                st.session_state.diag_step = "questioning"
-                st.session_state.q_count = 1
-                response = f"D'accord, le chapitre **{prompt}**. Question 1: ..."
-            elif st.session_state.q_count < 10:
-                st.session_state.q_count += 1
-                response = f"Question {st.session_state.q_count}: [Analyse...]"
-            else:
-                response = "Diagnostic terminé !"
-                st.session_state.user_data["plan_ready"] = True
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            st.rerun()
+            try:
+                # 1. Fetch the Student's Identity Card (Created in Step 1)
+                system_instruction = get_ai_system_prompt()
+                
+                # 2. Initialize the Gemini Model
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                # 3. Logic to handle the flow (Chapter vs. Questions)
+                if st.session_state.diag_step == "get_chapter":
+                    st.session_state.current_chapter = prompt
+                    st.session_state.diag_step = "questioning"
+                    st.session_state.q_count = 1
+                    # Instruction for the first question
+                    user_query = f"L'élève veut réviser le chapitre : '{prompt}'. Salue-le brièvement et pose la Question 1 du diagnostic."
+                else:
+                    st.session_state.q_count += 1
+                    user_query = prompt
+
+                # 4. Generate the Response using Profile + History
+                # We combine the system prompt with the chat history for full context
+                full_context = f"{system_instruction}\n\nHistorique du chat: {st.session_state.messages}\n\nInstruction actuelle: {user_query}"
+                
+                response = model.generate_content(full_context)
+                ai_text = response.text
+
+                # 5. Handle the End of Diagnostic
+                if st.session_state.q_count >= 10:
+                    ai_text += "\n\n**Diagnostic terminé !** Ton plan de révision est maintenant prêt dans l'onglet 'Plans'."
+                    st.session_state.user_data["plan_ready"] = True
+                    st.session_state.diag_step = "finished"
+
+                # 6. Display and Save
+                st.markdown(ai_text)
+                st.session_state.messages.append({"role": "assistant", "content": ai_text})
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Erreur avec l'IA : {e}")
 
 def show_view_plan():
     st.markdown("## 📅 Votre Plan de Révision")
@@ -695,6 +720,36 @@ def show_view_plan():
     if st.button("← Retour au Dashboard", use_container_width=True):
         st.session_state.step = "dashboard"
         st.rerun()
+
+def get_ai_system_prompt():
+    # 1. Pull data from the session
+    data = st.session_state.get("user_data", {})
+    subject = st.session_state.get("selected_subject", "Matière générale")
+    
+    # 2. Extract specific profile details
+    curriculum = data.get("curriculum", "Inconnu")
+    level = data.get("fr_level", "")
+    # Branch finds the section (Tunisian) or the Series/Voie (French)
+    branch = data.get("bac_type") or data.get("fr_serie", data.get("fr_voie", "Générale"))
+    philosophy = data.get("philosophy", "Sois un tuteur bienveillant.")
+    
+    # 3. Get the student's specific level for this subject
+    subject_levels = data.get("levels", {})
+    student_level = subject_levels.get(subject, "Satisfaisant")
+
+    # 4. Build the Instruction String (Mission X Core)
+    # We use += to avoid the triple-quote "blue code" glitch
+    prompt = f"Tu es 'AI Professor', un tuteur expert pour le système {curriculum}. "
+    prompt += f"L'élève est en classe de {level} {branch}. "
+    prompt += f"Sa matière actuelle est {subject}, et son niveau auto-évalué est '{student_level}'. "
+    prompt += f"PHILOSOPHIE DEMANDÉE : '{philosophy}'. "
+    prompt += "CONSIGNES : 1. Ne donne jamais la réponse directement. "
+    prompt += "2. Guide l'élève par le raisonnement et des indices. "
+    
+    if curriculum == "Tunisien":
+        prompt += "3. Puisque le système est Tunisien, utilise parfois des mots en 'Tunsi' (Derja) pour créer un lien."
+    
+    return prompt
 
 # --- ROUTER ---
 # This dictionary maps the step name to the corresponding function.
