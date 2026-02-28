@@ -6,7 +6,9 @@ from supabase import create_client
 
 # --- 1. INITIAL SETUP ---
 try:
+    # Use the latest configuration method
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # No changes needed to Groq or Supabase here
     groq_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 except Exception as e:
@@ -672,7 +674,7 @@ def show_chat_diagnose():
                 system_instruction = get_ai_system_prompt()
                 
                 # 2. Initialize the Gemini Model
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash-latest')
                 
                 # 3. Logic to handle the flow (Chapter vs. Questions)
                 if st.session_state.diag_step == "get_chapter":
