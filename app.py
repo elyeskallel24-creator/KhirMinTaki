@@ -781,39 +781,41 @@ def get_ai_system_prompt():
 
 def get_chapters_by_subject(curriculum, branch, subject):
     """
-    Returns the 100% accurate official list of chapters for the 2024-2025 program.
-    Currently optimized for: Bac Tunisien - Économie & Gestion - Matière: Gestion.
+    Official 2024-2025 Tunisian Bac Curriculum Database.
+    Section: Économie et Gestion
     """
-    # Database for Tunisian Bac: Économie et Gestion
-    tunisian_eco_gestion = {
+    # 1. Official Data for Bac Économie & Gestion
+    bac_eco_gestion = {
         "Gestion": [
-            "Gestion des Approvisionnements (Stock & Valorisation)",
-            "Gestion de la Production (Optimisation & Coûts)",
-            "Gestion Commerciale (Marketing & Ventes)",
-            "Gestion des Ressources Humaines (GRH & Paie)",
-            "Analyse de la Performance (Soldes de Gestion & CAF)",
-            "Analyse de la Rentabilité (Seuil de Rentabilité)",
-            "Gestion de l'Investissement (VAN, DRCI, IP)",
-            "Gestion du Financement (Emprunts & Autofinancement)",
-            "Analyse Fonctionnelle du Bilan (FRNG, BFR, Trésorerie)",
-            "Gestion Budgétaire (Budgets des Ventes & Trésorerie)"
+            "Thème 1 : Gestion des Approvisionnements (Stocks & Valorisation)",
+            "Thème 2 : Gestion de la Production (Plein emploi & Coûts)",
+            "Thème 3 : Gestion Commerciale (Marketing Mix & Ventes)",
+            "Thème 4 : Gestion des Ressources Humaines (Paie & Recrutement)",
+            "Thème 5 : Analyse de la Performance (SIG & CAF)",
+            "Thème 5 : Analyse de la Rentabilité (Seuil de rentabilité)",
+            "Thème 6 : Gestion de l'Investissement (VAN, DRCI, IP)",
+            "Thème 6 : Gestion du Financement (Emprunts & Plan de financement)",
+            "Thème 7 : Analyse Fonctionnelle du Bilan (FRNG, BFR, TN)",
+            "Thème 7 : Gestion Budgétaire (Trésorerie & Ventes)"
         ],
         "Économie": [
-            "La Croissance Économique",
-            "Les Facteurs de la Croissance",
-            "Les Mutations des Structures",
-            "L'Ouverture sur l'Extérieur",
-            "La Mondialisation",
-            "Le Développement Durable"
+            "Thème 1 : La Croissance Économique (Sources & Facteurs)",
+            "Thème 1 : Les Mutations des Structures Économiques",
+            "Thème 2 : L'Ouverture sur l'Extérieur",
+            "Thème 2 : La Mondialisation (Échanges & Firmes)",
+            "Thème 3 : Le Développement Durable (Indicateurs & Enjeux)",
+            "Thème 3 : L'Intégration Économique (Ex: Zone Euro)"
         ]
     }
 
-    # Logic to return the right list based on user profile
-    if curriculum == "Tunisien" and branch == "Économie et Gestion":
-        return tunisian_eco_gestion.get(subject, [])
+    # 2. Accuracy Logic
+    # We must match the exact string the user chose during signup
+    if curriculum == "Tunisien" and branch == "Sciences Économiques et Gestion":
+        return bac_eco_gestion.get(subject, ["Chapitre non répertorié"])
     
-    # Fallback for other branches (to be completed in later micro-steps)
-    return ["Chapitre Général 1", "Chapitre Général 2"]
+    # 3. Dynamic Fallback (If logic fails, we return a clear message)
+    return ["Veuillez vérifier votre profil (Bac Eco-Gestion requis)"]
+
 
 # --- ROUTER ---
 # This dictionary maps the step name to the corresponding function.
